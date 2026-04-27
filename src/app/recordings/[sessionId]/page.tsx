@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
+import { PROPOSAL_ITEMS, valueLabel } from "@/lib/proposal/items";
 
 export const dynamic = "force-dynamic";
 
@@ -60,6 +61,17 @@ export default async function RecordingDetailPage({
   if (!data) notFound();
 
   const t = data.transcripts?.[0];
+
+  const { data: proposalsData } = await supabase
+    .from("proposals")
+    .select("id,items,proposed_at")
+    .eq("session_id", params.sessionId)
+    .order("proposed_at", { ascending: false });
+  const proposals = (proposalsData ?? []) as Array<{
+    id: string;
+    items: Record<string, unknown>;
+    proposed_at: string;
+  }>;
   let displayName = data.operator_email ?? "未設定";
   if (data.operator_email) {
     const { data: role } = await supabase
@@ -142,6 +154,37 @@ export default async function RecordingDetailPage({
           ))}
           {(!t?.tags || t.tags.length === 0) && <span className="text-sm text-gray-500">-</span>}
         </div>
+      </section>
+
+      <section className="bg-white rounded shadow p-4">
+        <h2 className="font-semibold mb-2">提案結果</h2>
+        {proposals.length === 0 ? (
+          <p className="text-sm text-gray-500">この録音にひもづく提案結果はまだありません。</p>
+        ) : (
+          <div className="space-y-4">
+            {proposals.map((proposal) => (
+              <div key={proposal.id} className="border rounded p-3">
+                <div className="text-xs text-gray-500 mb-2">
+                  {new Date(proposal.proposed_at).toLocaleString("ja-JP", { hour12: false, timeZone: "Asia/Tokyo" })}
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                  {PROPOSAL_ITEMS.map((item) => {
+                    const v = valueLabel(proposal.items[item.key]);
+                    return (
+                      <div
+                        key={item.key}
+                        className={`flex items-center justify-between border rounded px-2 py-1 text-xs ${v.cls}`}
+                      >
+                        <span className="truncate">{item.label}</span>
+                        <span className="font-semibold ml-2">{v.text}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="bg-white rounded shadow p-4">
