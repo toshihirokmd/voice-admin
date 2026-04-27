@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireAdmin } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { PROPOSAL_ITEMS } from "@/lib/proposal/items";
+import { fetchProducts } from "@/lib/products/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,7 @@ type Recording = {
     title: string | null;
     summary: string | null;
     merged_text: string | null;
+    products: string[] | null;
   }>;
 };
 
@@ -70,11 +72,13 @@ function asArray(value: string | string[] | undefined): string[] {
 function buildHref(
   base: string,
   params: Record<string, string | undefined>,
-  successKeys: string[]
+  successKeys: string[],
+  productNames: string[] = []
 ): string {
   const sp = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) if (v) sp.set(k, v);
   for (const k of successKeys) sp.append("success", k);
+  for (const p of productNames) sp.append("product", p);
   return `${base}?${sp.toString()}`;
 }
 
@@ -87,6 +91,8 @@ export default async function RecordingsPage({
     operator?: string;
     success?: string | string[];
     match?: string;
+    product?: string | string[];
+    product_match?: string;
   };
 }) {
   await requireAdmin();
@@ -94,6 +100,9 @@ export default async function RecordingsPage({
 
   const successFilter = asArray(searchParams.success);
   const matchMode: "and" | "or" = searchParams.match === "or" ? "or" : "and";
+  const productFilter = asArray(searchParams.product);
+  const productMatchMode: "and" | "or" =
+    searchParams.product_match === "or" ? "or" : "and";
   const page = Math.max(1, parseInt(searchParams.page ?? "1", 10) || 1);
   const pageSize = 50;
   const from = (page - 1) * pageSize;
@@ -129,10 +138,33 @@ export default async function RecordingsPage({
     }
   }
 
+  // Narrow recordings further by product names mentioned in the call.
+  // - AND: transcripts.products must contain every selected name (`@>`)
+  // - OR : transcripts.products must overlap any selected name (`&&`)
+  let allowedRecordingIds: string[] | null = null;
+  if (productFilter.length > 0) {
+    let tq = supabase.from("transcripts").select("recording_id");
+    if (productMatchMode === "and") {
+      tq = tq.contains("products", productFilter);
+    } else {
+      tq = tq.overlaps("products", productFilter);
+    }
+    const { data: matchedTrans, error: tqErr } = await tq;
+    if (tqErr) {
+      return <p className="text-red-600">エラー: {tqErr.message}</p>;
+    }
+    allowedRecordingIds = Array.from(
+      new Set((matchedTrans ?? []).map((m: { recording_id: string }) => m.recording_id))
+    );
+    if (allowedRecordingIds.length === 0) {
+      return renderEmpty(searchParams, successFilter, matchMode);
+    }
+  }
+
   let query = supabase
     .from("recordings")
     .select(
-      "id,session_id,started_at,ended_at,duration_sec,operator_email,status,transcripts(title,summary,merged_text)",
+      "id,session_id,started_at,ended_at,duration_sec,operator_email,status,transcripts(title,summary,merged_text,products)",
       { count: "exact" }
     )
     .order("started_at", { ascending: false })
@@ -143,6 +175,9 @@ export default async function RecordingsPage({
   }
   if (allowedSessionIds) {
     query = query.in("session_id", allowedSessionIds);
+  }
+  if (allowedRecordingIds) {
+    query = query.in("id", allowedRecordingIds);
   }
 
   const { data: recordings, count, error } = await query;
@@ -193,7 +228,11 @@ export default async function RecordingsPage({
     q: searchParams.q,
     operator: searchParams.operator,
     match: matchMode === "or" ? "or" : undefined,
+    product_match: productMatchMode === "or" ? "or" : undefined,
   };
+
+  // Product master used to render the filter checkbox list.
+  const productMaster = await fetchProducts(false);
 
   return (
     <section>
@@ -215,7 +254,7 @@ export default async function RecordingsPage({
           <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded">
             検索
           </button>
-          {successFilter.length > 0 && (
+          {(successFilter.length > 0 || productFilter.length > 0) && (
             <Link href="/recordings" className="text-xs text-gray-500 hover:underline">
               フィルタをすべてクリア
             </Link>
@@ -279,6 +318,69 @@ export default async function RecordingsPage({
             })}
           </div>
         </details>
+
+        <details open={productFilter.length > 0}>
+          <summary className="cursor-pointer text-sm text-gray-700 hover:text-gray-900 select-none">
+            商品で絞り込み（複数選択可）
+            {productFilter.length > 0 && (
+              <span className="ml-2 text-xs text-blue-600">
+                {productFilter.length}項目選択中（{productMatchMode === "or" ? "OR" : "AND"}）
+              </span>
+            )}
+          </summary>
+          <div className="mt-3 flex items-center gap-4 text-xs">
+            <span className="text-gray-600">マッチ条件:</span>
+            <label className="flex items-center gap-1 cursor-pointer">
+              <input
+                type="radio"
+                name="product_match"
+                value="and"
+                defaultChecked={productMatchMode === "and"}
+                className="accent-blue-600"
+              />
+              <span>AND（全部含む）</span>
+            </label>
+            <label className="flex items-center gap-1 cursor-pointer">
+              <input
+                type="radio"
+                name="product_match"
+                value="or"
+                defaultChecked={productMatchMode === "or"}
+                className="accent-blue-600"
+              />
+              <span>OR（いずれか含む）</span>
+            </label>
+          </div>
+          <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+            {productMaster.map((p) => {
+              const checked = productFilter.includes(p.name);
+              return (
+                <label
+                  key={p.id}
+                  className={`flex items-center gap-1.5 px-2 py-1 border rounded cursor-pointer text-xs ${
+                    checked
+                      ? "bg-blue-100 border-blue-300 text-blue-800"
+                      : "border-gray-200 hover:bg-gray-50"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    name="product"
+                    value={p.name}
+                    defaultChecked={checked}
+                    className="accent-blue-600"
+                  />
+                  <span>{p.name}</span>
+                </label>
+              );
+            })}
+            {productMaster.length === 0 && (
+              <p className="col-span-full text-xs text-gray-500">
+                商品マスターが空です。/products から商品を追加してください。
+              </p>
+            )}
+          </div>
+        </details>
       </form>
 
       <div className="bg-white rounded shadow overflow-hidden">
@@ -290,6 +392,7 @@ export default async function RecordingsPage({
               <th className="px-3 py-2">セッションID</th>
               <th className="px-3 py-2">対応者</th>
               <th className="px-3 py-2">タイトル</th>
+              <th className="px-3 py-2">商品</th>
               <th className="px-3 py-2">内容</th>
               <th className="px-3 py-2">提案成功</th>
               <th className="px-3 py-2">ステータス</th>
@@ -309,6 +412,28 @@ export default async function RecordingsPage({
                     {operatorDisplayName(r.operator_email, byEmail)}
                   </td>
                   <td className="px-3 py-2">{transcript?.title ?? "-"}</td>
+                  <td className="px-3 py-2">
+                    {(transcript?.products ?? []).length === 0 ? (
+                      <span className="text-gray-300 text-xs">-</span>
+                    ) : (
+                      <div className="flex flex-wrap gap-1">
+                        {(transcript?.products ?? []).map((name) => (
+                          <Link
+                            key={name}
+                            href={buildHref(
+                              "/recordings",
+                              { product_match: "or" },
+                              [],
+                              [name]
+                            )}
+                            className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-300 hover:bg-blue-200"
+                          >
+                            {name}
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </td>
                   <td className="px-3 py-2 max-w-md">{truncate(transcript?.summary, 60)}</td>
                   <td className="px-3 py-2">
                     {successKeys.length === 0 ? (
@@ -339,7 +464,7 @@ export default async function RecordingsPage({
             })}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-3 py-8 text-center text-gray-500">
+                <td colSpan={10} className="px-3 py-8 text-center text-gray-500">
                   該当する録音がありません
                 </td>
               </tr>
@@ -355,7 +480,7 @@ export default async function RecordingsPage({
         <div className="flex gap-2">
           {page > 1 && (
             <Link
-              href={buildHref("/recordings", { ...baseParams, page: String(page - 1) }, successFilter)}
+              href={buildHref("/recordings", { ...baseParams, page: String(page - 1) }, successFilter, productFilter)}
               className="px-3 py-1 border rounded"
             >
               前へ
@@ -363,7 +488,7 @@ export default async function RecordingsPage({
           )}
           {page < totalPages && (
             <Link
-              href={buildHref("/recordings", { ...baseParams, page: String(page + 1) }, successFilter)}
+              href={buildHref("/recordings", { ...baseParams, page: String(page + 1) }, successFilter, productFilter)}
               className="px-3 py-1 border rounded"
             >
               次へ

@@ -23,6 +23,7 @@ type RecordingDetail = {
     summary: string | null;
     merged_text: string | null;
     tags: string[] | null;
+    products: string[] | null;
     tokens_in: number | null;
     tokens_out: number | null;
   }>;
@@ -50,7 +51,7 @@ export default async function RecordingDetailPage({
   const { data, error } = await supabase
     .from("recordings")
     .select(
-      "id,session_id,started_at,ended_at,duration_sec,operator_email,status,customer_id,source_url,mic_path,speaker_path,transcripts(title,summary,merged_text,tags,tokens_in,tokens_out)"
+      "id,session_id,started_at,ended_at,duration_sec,operator_email,status,customer_id,source_url,mic_path,speaker_path,transcripts(title,summary,merged_text,tags,products,tokens_in,tokens_out)"
     )
     .eq("session_id", params.sessionId)
     .maybeSingle<RecordingDetail>();
@@ -90,6 +91,20 @@ export default async function RecordingDetailPage({
           ← 一覧に戻る
         </Link>
         <h1 className="text-2xl font-bold mt-2">{t?.title ?? "(タイトルなし)"}</h1>
+        {(t?.products ?? []).length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5 items-center">
+            <span className="text-xs text-gray-500">言及された商品:</span>
+            {(t?.products ?? []).map((name) => (
+              <Link
+                key={name}
+                href={`/recordings?${new URLSearchParams({ product: name, product_match: "or" }).toString()}`}
+                className="text-xs px-2 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-300 hover:bg-blue-200"
+              >
+                {name}
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
 
       <section className="bg-white rounded shadow p-4 grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">

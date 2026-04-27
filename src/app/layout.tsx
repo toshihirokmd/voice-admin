@@ -27,6 +27,7 @@ export default async function RootLayout({
                 <>
                   <Link href="/recordings" className="hover:underline">録音一覧</Link>
                   <Link href="/prompt" className="hover:underline">プロンプト</Link>
+                  <Link href="/products" className="hover:underline">商品</Link>
                   <Link href="/users" className="hover:underline">ユーザー</Link>
                 </>
               )}
