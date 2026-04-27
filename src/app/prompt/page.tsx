@@ -70,7 +70,7 @@ export default async function PromptPage() {
         />
         <div className="flex items-center justify-between">
           <p className="text-xs text-gray-500">
-            最終更新: {data?.updated_at ? new Date(data.updated_at).toLocaleString("ja-JP") : "-"}{" "}
+            最終更新: {data?.updated_at ? new Date(data.updated_at).toLocaleString("ja-JP", { hour12: false, timeZone: "Asia/Tokyo" }) : "-"}{" "}
             {data?.updated_by_email && `（${data.updated_by_email}）`}
           </p>
           <button

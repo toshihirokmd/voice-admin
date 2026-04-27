@@ -88,7 +88,7 @@ export default async function UsersPage() {
                   <span className="text-xs px-2 py-0.5 rounded bg-gray-200">{u.role}</span>
                 </td>
                 <td className="px-3 py-2 text-xs text-gray-500">
-                  {new Date(u.created_at).toLocaleDateString("ja-JP")}
+                  {new Date(u.created_at).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" })}
                 </td>
                 <td className="px-3 py-2"></td>
               </tr>

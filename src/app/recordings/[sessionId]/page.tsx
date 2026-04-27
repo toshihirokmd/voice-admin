@@ -29,7 +29,7 @@ type RecordingDetail = {
 
 function formatDateTime(iso: string | null): string {
   if (!iso) return "-";
-  return new Date(iso).toLocaleString("ja-JP", { hour12: false });
+  return new Date(iso).toLocaleString("ja-JP", { hour12: false, timeZone: "Asia/Tokyo" });
 }
 
 function formatDuration(sec: number | null): string {

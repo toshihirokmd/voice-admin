@@ -34,7 +34,7 @@ function formatDuration(sec: number | null): string {
 function formatDateTime(iso: string | null): string {
   if (!iso) return "-";
   const d = new Date(iso);
-  return d.toLocaleString("ja-JP", { hour12: false });
+  return d.toLocaleString("ja-JP", { hour12: false, timeZone: "Asia/Tokyo" });
 }
 
 function operatorDisplayName(
