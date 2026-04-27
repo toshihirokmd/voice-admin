@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
+import { PROPOSAL_ITEMS } from "@/lib/proposal/items";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,13 @@ type UserRoleRow = {
   email: string;
   display_name: string | null;
 };
+
+type ProposalRow = {
+  session_id: string;
+  items: Record<string, unknown>;
+};
+
+const PROPOSAL_LABEL_BY_KEY = new Map(PROPOSAL_ITEMS.map((p) => [p.key, p.label]));
 
 function formatDuration(sec: number | null): string {
   if (sec == null) return "-";
@@ -53,18 +61,63 @@ function truncate(text: string | null, max = 80): string {
   return oneLine.length > max ? `${oneLine.slice(0, max)}…` : oneLine;
 }
 
+function asArray(value: string | string[] | undefined): string[] {
+  if (Array.isArray(value)) return value.filter(Boolean);
+  if (typeof value === "string" && value) return [value];
+  return [];
+}
+
+function buildHref(
+  base: string,
+  params: Record<string, string | undefined>,
+  successKeys: string[]
+): string {
+  const sp = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) if (v) sp.set(k, v);
+  for (const k of successKeys) sp.append("success", k);
+  return `${base}?${sp.toString()}`;
+}
+
 export default async function RecordingsPage({
   searchParams,
 }: {
-  searchParams: { page?: string; q?: string; operator?: string };
+  searchParams: {
+    page?: string;
+    q?: string;
+    operator?: string;
+    success?: string | string[];
+  };
 }) {
   await requireAdmin();
   const supabase = createClient();
 
+  const successFilter = asArray(searchParams.success);
   const page = Math.max(1, parseInt(searchParams.page ?? "1", 10) || 1);
   const pageSize = 50;
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
+
+  // If the user filtered by successful proposal items, narrow recordings via
+  // the proposals table first. Multiple keys are AND-combined: only proposals
+  // whose row has every selected key set to "1" qualify.
+  let allowedSessionIds: string[] | null = null;
+  if (successFilter.length > 0) {
+    let pq = supabase.from("proposals").select("session_id");
+    for (const key of successFilter) {
+      pq = pq.eq(`items->>${key}`, "1");
+    }
+    const { data: matched, error: pqErr } = await pq;
+    if (pqErr) {
+      return <p className="text-red-600">エラー: {pqErr.message}</p>;
+    }
+    allowedSessionIds = Array.from(
+      new Set((matched ?? []).map((m: { session_id: string }) => m.session_id))
+    );
+    if (allowedSessionIds.length === 0) {
+      // Render the form + empty state without hitting recordings at all.
+      return renderEmpty(searchParams, successFilter);
+    }
+  }
 
   let query = supabase
     .from("recordings")
@@ -78,10 +131,32 @@ export default async function RecordingsPage({
   if (searchParams.operator) {
     query = query.ilike("operator_email", `%${searchParams.operator}%`);
   }
+  if (allowedSessionIds) {
+    query = query.in("session_id", allowedSessionIds);
+  }
 
   const { data: recordings, count, error } = await query;
   if (error) {
     return <p className="text-red-600">エラー: {error.message}</p>;
+  }
+
+  const sessionIds = (recordings ?? []).map((r: Recording) => r.session_id);
+
+  // Pull proposals for the visible page so we can render a "提案成功" column
+  // even when no filter is active.
+  let proposalsBySession = new Map<string, Set<string>>();
+  if (sessionIds.length > 0) {
+    const { data: proposalRows } = await supabase
+      .from("proposals")
+      .select("session_id,items")
+      .in("session_id", sessionIds);
+    for (const p of (proposalRows ?? []) as ProposalRow[]) {
+      const set = proposalsBySession.get(p.session_id) ?? new Set<string>();
+      for (const [k, v] of Object.entries(p.items ?? {})) {
+        if (v === "1") set.add(k);
+      }
+      proposalsBySession.set(p.session_id, set);
+    }
   }
 
   const emails = Array.from(
@@ -104,26 +179,72 @@ export default async function RecordingsPage({
   });
 
   const totalPages = count ? Math.ceil(count / pageSize) : 1;
+  const baseParams = {
+    q: searchParams.q,
+    operator: searchParams.operator,
+  };
 
   return (
     <section>
       <h1 className="text-2xl font-bold mb-4">録音一覧</h1>
-      <form className="flex gap-3 mb-4 text-sm" action="/recordings">
-        <input
-          name="q"
-          defaultValue={searchParams.q ?? ""}
-          placeholder="タイトル検索"
-          className="px-3 py-2 border rounded"
-        />
-        <input
-          name="operator"
-          defaultValue={searchParams.operator ?? ""}
-          placeholder="対応者メアド部分一致"
-          className="px-3 py-2 border rounded"
-        />
-        <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded">
-          検索
-        </button>
+      <form className="space-y-3 mb-4 text-sm bg-white rounded shadow p-4" action="/recordings">
+        <div className="flex flex-wrap gap-3 items-center">
+          <input
+            name="q"
+            defaultValue={searchParams.q ?? ""}
+            placeholder="タイトル検索"
+            className="px-3 py-2 border rounded"
+          />
+          <input
+            name="operator"
+            defaultValue={searchParams.operator ?? ""}
+            placeholder="対応者メアド部分一致"
+            className="px-3 py-2 border rounded"
+          />
+          <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded">
+            検索
+          </button>
+          {successFilter.length > 0 && (
+            <Link href="/recordings" className="text-xs text-gray-500 hover:underline">
+              フィルタをすべてクリア
+            </Link>
+          )}
+        </div>
+
+        <details open={successFilter.length > 0}>
+          <summary className="cursor-pointer text-sm text-gray-700 hover:text-gray-900 select-none">
+            提案成功で絞り込み（複数選択可・AND条件）
+            {successFilter.length > 0 && (
+              <span className="ml-2 text-xs text-blue-600">
+                {successFilter.length}項目選択中
+              </span>
+            )}
+          </summary>
+          <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+            {PROPOSAL_ITEMS.map((item) => {
+              const checked = successFilter.includes(item.key);
+              return (
+                <label
+                  key={item.key}
+                  className={`flex items-center gap-1.5 px-2 py-1 border rounded cursor-pointer text-xs ${
+                    checked
+                      ? "bg-green-100 border-green-300 text-green-800"
+                      : "border-gray-200 hover:bg-gray-50"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    name="success"
+                    value={item.key}
+                    defaultChecked={checked}
+                    className="accent-green-600"
+                  />
+                  <span>{item.label}</span>
+                </label>
+              );
+            })}
+          </div>
+        </details>
       </form>
 
       <div className="bg-white rounded shadow overflow-hidden">
@@ -136,6 +257,7 @@ export default async function RecordingsPage({
               <th className="px-3 py-2">対応者</th>
               <th className="px-3 py-2">タイトル</th>
               <th className="px-3 py-2">内容</th>
+              <th className="px-3 py-2">提案成功</th>
               <th className="px-3 py-2">ステータス</th>
               <th className="px-3 py-2">操作</th>
             </tr>
@@ -143,6 +265,7 @@ export default async function RecordingsPage({
           <tbody>
             {filtered.map((r: Recording) => {
               const transcript = r.transcripts?.[0];
+              const successKeys = Array.from(proposalsBySession.get(r.session_id) ?? []);
               return (
                 <tr key={r.id} className="border-t hover:bg-gray-50">
                   <td className="px-3 py-2 whitespace-nowrap">{formatDateTime(r.started_at)}</td>
@@ -153,6 +276,22 @@ export default async function RecordingsPage({
                   </td>
                   <td className="px-3 py-2">{transcript?.title ?? "-"}</td>
                   <td className="px-3 py-2 max-w-md">{truncate(transcript?.summary, 60)}</td>
+                  <td className="px-3 py-2">
+                    {successKeys.length === 0 ? (
+                      <span className="text-gray-300 text-xs">-</span>
+                    ) : (
+                      <div className="flex flex-wrap gap-1">
+                        {successKeys.map((key) => (
+                          <span
+                            key={key}
+                            className="text-xs px-1.5 py-0.5 rounded bg-green-100 text-green-800 border border-green-300"
+                          >
+                            {PROPOSAL_LABEL_BY_KEY.get(key) ?? key}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </td>
                   <td className="px-3 py-2">
                     <span className="text-xs px-2 py-0.5 rounded bg-gray-200">{r.status}</span>
                   </td>
@@ -166,7 +305,7 @@ export default async function RecordingsPage({
             })}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-3 py-8 text-center text-gray-500">
+                <td colSpan={9} className="px-3 py-8 text-center text-gray-500">
                   該当する録音がありません
                 </td>
               </tr>
@@ -182,11 +321,7 @@ export default async function RecordingsPage({
         <div className="flex gap-2">
           {page > 1 && (
             <Link
-              href={`/recordings?${new URLSearchParams({
-                ...(searchParams.q ? { q: searchParams.q } : {}),
-                ...(searchParams.operator ? { operator: searchParams.operator } : {}),
-                page: String(page - 1),
-              }).toString()}`}
+              href={buildHref("/recordings", { ...baseParams, page: String(page - 1) }, successFilter)}
               className="px-3 py-1 border rounded"
             >
               前へ
@@ -194,11 +329,7 @@ export default async function RecordingsPage({
           )}
           {page < totalPages && (
             <Link
-              href={`/recordings?${new URLSearchParams({
-                ...(searchParams.q ? { q: searchParams.q } : {}),
-                ...(searchParams.operator ? { operator: searchParams.operator } : {}),
-                page: String(page + 1),
-              }).toString()}`}
+              href={buildHref("/recordings", { ...baseParams, page: String(page + 1) }, successFilter)}
               className="px-3 py-1 border rounded"
             >
               次へ
@@ -206,6 +337,29 @@ export default async function RecordingsPage({
           )}
         </div>
       </div>
+    </section>
+  );
+}
+
+function renderEmpty(
+  searchParams: { q?: string; operator?: string },
+  successFilter: string[]
+) {
+  return (
+    <section>
+      <h1 className="text-2xl font-bold mb-4">録音一覧</h1>
+      <p className="text-sm text-gray-600 mb-4">
+        指定された絞り込み条件に一致する録音は見つかりませんでした。
+      </p>
+      <Link
+        href={buildHref("/recordings", { q: searchParams.q, operator: searchParams.operator }, [])}
+        className="text-blue-600 hover:underline text-sm"
+      >
+        フィルタをクリア
+      </Link>
+      <p className="text-xs text-gray-500 mt-2">
+        絞り込み中: {successFilter.join(", ")}
+      </p>
     </section>
   );
 }
