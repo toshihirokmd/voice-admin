@@ -94,24 +94,34 @@ export default async function RecordingDetailPage({
 
       <section className="bg-white rounded shadow p-4">
         <h2 className="font-semibold mb-2">音声ダウンロード</h2>
-        <div className="flex gap-3">
-          {data.mic_path && (
-            <a
-              href={`/api/download/${data.session_id}?track=mic`}
-              className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              オペレーター音声(mic.wav)
-            </a>
-          )}
-          {data.speaker_path && (
-            <a
-              href={`/api/download/${data.session_id}?track=speaker`}
-              className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              お客様音声(speaker.wav)
-            </a>
-          )}
-          {!data.mic_path && !data.speaker_path && (
+        <div className="flex flex-wrap gap-3 items-center">
+          {data.mic_path && data.speaker_path ? (
+            <>
+              <a
+                href={`/api/download/${data.session_id}?track=mixed`}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold"
+              >
+                通話音声をダウンロード（統合）
+              </a>
+              <details className="text-sm text-gray-500">
+                <summary className="cursor-pointer hover:text-gray-700">個別トラックも必要な場合</summary>
+                <div className="mt-2 flex gap-2">
+                  <a
+                    href={`/api/download/${data.session_id}?track=mic`}
+                    className="px-3 py-1.5 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 text-xs"
+                  >
+                    オペレーター音声のみ
+                  </a>
+                  <a
+                    href={`/api/download/${data.session_id}?track=speaker`}
+                    className="px-3 py-1.5 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 text-xs"
+                  >
+                    お客様音声のみ
+                  </a>
+                </div>
+              </details>
+            </>
+          ) : (
             <p className="text-sm text-gray-500">音声ファイルはまだ保存されていません。</p>
           )}
         </div>
