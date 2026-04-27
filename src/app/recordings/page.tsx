@@ -86,25 +86,35 @@ export default async function RecordingsPage({
     q?: string;
     operator?: string;
     success?: string | string[];
+    match?: string;
   };
 }) {
   await requireAdmin();
   const supabase = createClient();
 
   const successFilter = asArray(searchParams.success);
+  const matchMode: "and" | "or" = searchParams.match === "or" ? "or" : "and";
   const page = Math.max(1, parseInt(searchParams.page ?? "1", 10) || 1);
   const pageSize = 50;
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
 
   // If the user filtered by successful proposal items, narrow recordings via
-  // the proposals table first. Multiple keys are AND-combined: only proposals
-  // whose row has every selected key set to "1" qualify.
+  // the proposals table first.
+  // - AND: every selected key must be "1" on the SAME proposals row
+  // - OR : at least one selected key must be "1" on ANY proposals row
   let allowedSessionIds: string[] | null = null;
   if (successFilter.length > 0) {
     let pq = supabase.from("proposals").select("session_id");
-    for (const key of successFilter) {
-      pq = pq.eq(`items->>${key}`, "1");
+    if (matchMode === "and") {
+      for (const key of successFilter) {
+        pq = pq.eq(`items->>${key}`, "1");
+      }
+    } else {
+      const orClause = successFilter
+        .map((key) => `items->>${key}.eq.1`)
+        .join(",");
+      pq = pq.or(orClause);
     }
     const { data: matched, error: pqErr } = await pq;
     if (pqErr) {
@@ -115,7 +125,7 @@ export default async function RecordingsPage({
     );
     if (allowedSessionIds.length === 0) {
       // Render the form + empty state without hitting recordings at all.
-      return renderEmpty(searchParams, successFilter);
+      return renderEmpty(searchParams, successFilter, matchMode);
     }
   }
 
@@ -182,6 +192,7 @@ export default async function RecordingsPage({
   const baseParams = {
     q: searchParams.q,
     operator: searchParams.operator,
+    match: matchMode === "or" ? "or" : undefined,
   };
 
   return (
@@ -213,13 +224,36 @@ export default async function RecordingsPage({
 
         <details open={successFilter.length > 0}>
           <summary className="cursor-pointer text-sm text-gray-700 hover:text-gray-900 select-none">
-            提案成功で絞り込み（複数選択可・AND条件）
+            提案成功で絞り込み（複数選択可）
             {successFilter.length > 0 && (
               <span className="ml-2 text-xs text-blue-600">
-                {successFilter.length}項目選択中
+                {successFilter.length}項目選択中（{matchMode === "or" ? "OR" : "AND"}）
               </span>
             )}
           </summary>
+          <div className="mt-3 flex items-center gap-4 text-xs">
+            <span className="text-gray-600">マッチ条件:</span>
+            <label className="flex items-center gap-1 cursor-pointer">
+              <input
+                type="radio"
+                name="match"
+                value="and"
+                defaultChecked={matchMode === "and"}
+                className="accent-blue-600"
+              />
+              <span>AND（全部成功）</span>
+            </label>
+            <label className="flex items-center gap-1 cursor-pointer">
+              <input
+                type="radio"
+                name="match"
+                value="or"
+                defaultChecked={matchMode === "or"}
+                className="accent-blue-600"
+              />
+              <span>OR（いずれか成功）</span>
+            </label>
+          </div>
           <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
             {PROPOSAL_ITEMS.map((item) => {
               const checked = successFilter.includes(item.key);
@@ -343,7 +377,8 @@ export default async function RecordingsPage({
 
 function renderEmpty(
   searchParams: { q?: string; operator?: string },
-  successFilter: string[]
+  successFilter: string[],
+  matchMode: "and" | "or"
 ) {
   return (
     <section>
@@ -358,7 +393,7 @@ function renderEmpty(
         フィルタをクリア
       </Link>
       <p className="text-xs text-gray-500 mt-2">
-        絞り込み中: {successFilter.join(", ")}
+        絞り込み中（{matchMode === "or" ? "OR" : "AND"}）: {successFilter.join(", ")}
       </p>
     </section>
   );
