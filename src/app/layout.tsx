@@ -39,7 +39,7 @@ export default async function RootLayout({
             </nav>
           </div>
         </header>
-        <main className="max-w-6xl mx-auto px-4 py-6">{children}</main>
+        <main className="max-w-[1600px] mx-auto px-4 py-6">{children}</main>
       </body>
     </html>
   );

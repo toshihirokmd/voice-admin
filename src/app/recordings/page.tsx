@@ -383,12 +383,24 @@ export default async function RecordingsPage({
         </details>
       </form>
 
-      <div className="bg-white rounded shadow overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-100 text-left">
+      <div className="bg-white rounded shadow overflow-x-auto">
+        <table className="w-full text-sm table-fixed">
+          <colgroup>
+            <col className="w-[140px]" />
+            <col className="w-[64px]" />
+            <col className="w-[100px]" />
+            <col className="w-[100px]" />
+            <col className="w-[260px]" />
+            <col className="w-[200px]" />
+            <col className="w-auto" />
+            <col className="w-[200px]" />
+            <col className="w-[110px]" />
+            <col className="w-[60px]" />
+          </colgroup>
+          <thead className="bg-gray-100 text-left sticky top-0 z-10">
             <tr>
               <th className="px-3 py-2">録音日時</th>
-              <th className="px-3 py-2">録音時間</th>
+              <th className="px-3 py-2">時間</th>
               <th className="px-3 py-2">セッションID</th>
               <th className="px-3 py-2">対応者</th>
               <th className="px-3 py-2">タイトル</th>
@@ -403,15 +415,19 @@ export default async function RecordingsPage({
             {filtered.map((r: Recording) => {
               const transcript = r.transcripts?.[0];
               const successKeys = Array.from(proposalsBySession.get(r.session_id) ?? []);
+              const titleText = transcript?.title ?? "-";
+              const summaryText = (transcript?.summary ?? "").replace(/\s+/g, " ").trim();
               return (
-                <tr key={r.id} className="border-t hover:bg-gray-50">
-                  <td className="px-3 py-2 whitespace-nowrap">{formatDateTime(r.started_at)}</td>
+                <tr key={r.id} className="border-t hover:bg-gray-50 align-top">
+                  <td className="px-3 py-2 whitespace-nowrap text-xs">{formatDateTime(r.started_at)}</td>
                   <td className="px-3 py-2 whitespace-nowrap">{formatDuration(r.duration_sec)}</td>
-                  <td className="px-3 py-2 font-mono text-xs">{r.session_id.slice(0, 8)}…</td>
-                  <td className="px-3 py-2" title={r.operator_email ?? ""}>
+                  <td className="px-3 py-2 font-mono text-xs truncate">{r.session_id.slice(0, 8)}…</td>
+                  <td className="px-3 py-2 truncate" title={r.operator_email ?? ""}>
                     {operatorDisplayName(r.operator_email, byEmail)}
                   </td>
-                  <td className="px-3 py-2">{transcript?.title ?? "-"}</td>
+                  <td className="px-3 py-2 truncate" title={titleText}>
+                    {titleText}
+                  </td>
                   <td className="px-3 py-2">
                     {(transcript?.products ?? []).length === 0 ? (
                       <span className="text-gray-300 text-xs">-</span>
@@ -426,7 +442,7 @@ export default async function RecordingsPage({
                               [],
                               [name]
                             )}
-                            className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-300 hover:bg-blue-200"
+                            className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-300 hover:bg-blue-200 whitespace-nowrap"
                           >
                             {name}
                           </Link>
@@ -434,7 +450,9 @@ export default async function RecordingsPage({
                       </div>
                     )}
                   </td>
-                  <td className="px-3 py-2 max-w-md">{truncate(transcript?.summary, 60)}</td>
+                  <td className="px-3 py-2 text-xs leading-snug" title={summaryText}>
+                    <span className="block overflow-hidden line-clamp-2">{summaryText || "-"}</span>
+                  </td>
                   <td className="px-3 py-2">
                     {successKeys.length === 0 ? (
                       <span className="text-gray-300 text-xs">-</span>
@@ -443,7 +461,7 @@ export default async function RecordingsPage({
                         {successKeys.map((key) => (
                           <span
                             key={key}
-                            className="text-xs px-1.5 py-0.5 rounded bg-green-100 text-green-800 border border-green-300"
+                            className="text-xs px-1.5 py-0.5 rounded bg-green-100 text-green-800 border border-green-300 whitespace-nowrap"
                           >
                             {PROPOSAL_LABEL_BY_KEY.get(key) ?? key}
                           </span>
@@ -451,7 +469,7 @@ export default async function RecordingsPage({
                       </div>
                     )}
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-3 py-2 whitespace-nowrap">
                     <span className="text-xs px-2 py-0.5 rounded bg-gray-200">{r.status}</span>
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap">
