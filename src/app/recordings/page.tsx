@@ -451,7 +451,7 @@ export default async function RecordingsPage({
                     )}
                   </td>
                   <td className="px-3 py-2 text-xs leading-snug" title={summaryText}>
-                    <span className="block overflow-hidden line-clamp-2">{summaryText || "-"}</span>
+                    {truncate(summaryText, 120) || "-"}
                   </td>
                   <td className="px-3 py-2">
                     {successKeys.length === 0 ? (
