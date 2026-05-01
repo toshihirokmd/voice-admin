@@ -1,27 +1,46 @@
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
+import { PromptForm, type SavePromptState } from "./prompt-form";
 
 export const dynamic = "force-dynamic";
 
-async function savePrompt(formData: FormData) {
+async function savePrompt(
+  _prev: SavePromptState,
+  formData: FormData,
+): Promise<SavePromptState> {
   "use server";
-  const user = await requireAdmin();
-  const body = String(formData.get("body") ?? "").trim();
-  if (!body) return;
-  const supabase = createClient();
-  const { error } = await supabase
-    .from("active_prompt")
-    .update({
-      body,
-      updated_by_email: user.email,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", 1);
-  if (error) {
-    throw new Error(`保存に失敗しました: ${error.message}`);
+  try {
+    const user = await requireAdmin();
+    const body = String(formData.get("body") ?? "").trim();
+    if (!body) {
+      return { ok: false, message: "本文が空です", ts: Date.now() };
+    }
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("active_prompt")
+      .update({
+        body,
+        updated_by_email: user.email,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", 1);
+    if (error) {
+      return {
+        ok: false,
+        message: error.message,
+        ts: Date.now(),
+      };
+    }
+    revalidatePath("/prompt");
+    return { ok: true, message: "保存しました", ts: Date.now() };
+  } catch (exc) {
+    return {
+      ok: false,
+      message: exc instanceof Error ? exc.message : String(exc),
+      ts: Date.now(),
+    };
   }
-  revalidatePath("/prompt");
 }
 
 export default async function PromptPage() {
@@ -36,6 +55,15 @@ export default async function PromptPage() {
   if (error) {
     return <p className="text-red-600">エラー: {error.message}</p>;
   }
+
+  const meta = `最終更新: ${
+    data?.updated_at
+      ? new Date(data.updated_at).toLocaleString("ja-JP", {
+          hour12: false,
+          timeZone: "Asia/Tokyo",
+        })
+      : "-"
+  }${data?.updated_by_email ? `（${data.updated_by_email}）` : ""}`;
 
   return (
     <section className="space-y-4">
@@ -60,27 +88,11 @@ export default async function PromptPage() {
         </ul>
       </div>
 
-      <form action={savePrompt} className="bg-white rounded shadow p-4 space-y-3">
-        <textarea
-          name="body"
-          defaultValue={data?.body ?? ""}
-          rows={30}
-          className="w-full font-mono text-sm border rounded p-3"
-          required
-        />
-        <div className="flex items-center justify-between">
-          <p className="text-xs text-gray-500">
-            最終更新: {data?.updated_at ? new Date(data.updated_at).toLocaleString("ja-JP", { hour12: false, timeZone: "Asia/Tokyo" }) : "-"}{" "}
-            {data?.updated_by_email && `（${data.updated_by_email}）`}
-          </p>
-          <button
-            type="submit"
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
-            保存
-          </button>
-        </div>
-      </form>
+      <PromptForm
+        defaultBody={data?.body ?? ""}
+        meta={meta}
+        action={savePrompt}
+      />
     </section>
   );
 }
