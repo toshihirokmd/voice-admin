@@ -1,6 +1,8 @@
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
+import { ActionResult } from "@/lib/forms/stateful-save-button";
+import { UserRow } from "./user-row";
 
 export const dynamic = "force-dynamic";
 
@@ -11,19 +13,39 @@ type UserRole = {
   created_at: string;
 };
 
-async function updateUser(formData: FormData) {
+async function updateUser(
+  _prev: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
   "use server";
-  await requireAdmin();
-  const email = String(formData.get("email") ?? "").trim();
-  const displayName = String(formData.get("display_name") ?? "").trim() || null;
-  const role = String(formData.get("role") ?? "");
-  if (!email || (role !== "admin" && role !== "operator")) return;
-  const supabase = createClient();
-  await supabase
-    .from("user_roles")
-    .update({ display_name: displayName, role })
-    .eq("email", email);
-  revalidatePath("/users");
+  try {
+    await requireAdmin();
+    const email = String(formData.get("email") ?? "").trim();
+    const displayName = String(formData.get("display_name") ?? "").trim() || null;
+    const role = String(formData.get("role") ?? "");
+    if (!email) {
+      return { ok: false, message: "メールアドレスが無効です", ts: Date.now() };
+    }
+    if (role !== "admin" && role !== "operator") {
+      return { ok: false, message: "ロールが無効です", ts: Date.now() };
+    }
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("user_roles")
+      .update({ display_name: displayName, role })
+      .eq("email", email);
+    if (error) {
+      return { ok: false, message: error.message, ts: Date.now() };
+    }
+    revalidatePath("/users");
+    return { ok: true, message: "保存しました", ts: Date.now() };
+  } catch (exc) {
+    return {
+      ok: false,
+      message: exc instanceof Error ? exc.message : String(exc),
+      ts: Date.now(),
+    };
+  }
 }
 
 export default async function UsersPage() {
@@ -61,37 +83,7 @@ export default async function UsersPage() {
           </thead>
           <tbody>
             {users.map((u) => (
-              <tr key={u.email} className="border-t">
-                <td className="px-3 py-2 font-mono text-xs">{u.email}</td>
-                <td className="px-3 py-2">
-                  <form action={updateUser} className="flex gap-2 items-center">
-                    <input type="hidden" name="email" value={u.email} />
-                    <input
-                      name="display_name"
-                      defaultValue={u.display_name ?? ""}
-                      className="border rounded px-2 py-1 text-sm"
-                      placeholder="例: 山田太郎"
-                    />
-                    <select name="role" defaultValue={u.role} className="border rounded px-2 py-1 text-sm">
-                      <option value="operator">operator</option>
-                      <option value="admin">admin</option>
-                    </select>
-                    <button
-                      type="submit"
-                      className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
-                    >
-                      保存
-                    </button>
-                  </form>
-                </td>
-                <td className="px-3 py-2">
-                  <span className="text-xs px-2 py-0.5 rounded bg-gray-200">{u.role}</span>
-                </td>
-                <td className="px-3 py-2 text-xs text-gray-500">
-                  {new Date(u.created_at).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" })}
-                </td>
-                <td className="px-3 py-2"></td>
-              </tr>
+              <UserRow key={u.email} user={u} action={updateUser} />
             ))}
             {users.length === 0 && (
               <tr>

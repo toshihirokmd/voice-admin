@@ -1,87 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useFormState, useFormStatus } from "react-dom";
+import { useFormState } from "react-dom";
+import {
+  ActionResult,
+  StatefulSaveButton,
+} from "@/lib/forms/stateful-save-button";
 
-export type SavePromptState =
-  | { ok: true; message: string; ts: number }
-  | { ok: false; message: string; ts: number }
-  | null;
-
-function SubmitButton({
-  lastSavedAt,
-  lastErrorAt,
-}: {
-  lastSavedAt: number | null;
-  lastErrorAt: number | null;
-}) {
-  const { pending } = useFormStatus();
-  const [showSaved, setShowSaved] = useState(false);
-  const [showError, setShowError] = useState(false);
-
-  useEffect(() => {
-    if (!lastSavedAt) return;
-    setShowSaved(true);
-    setShowError(false);
-    const timer = setTimeout(() => setShowSaved(false), 3000);
-    return () => clearTimeout(timer);
-  }, [lastSavedAt]);
-
-  useEffect(() => {
-    if (!lastErrorAt) return;
-    setShowError(true);
-    setShowSaved(false);
-    const timer = setTimeout(() => setShowError(false), 5000);
-    return () => clearTimeout(timer);
-  }, [lastErrorAt]);
-
-  if (pending) {
-    return (
-      <button
-        type="submit"
-        disabled
-        className="px-4 py-2 bg-blue-400 text-white rounded inline-flex items-center gap-2"
-      >
-        <span
-          className="inline-block h-3 w-3 rounded-full border-2 border-white border-t-transparent animate-spin"
-          aria-hidden
-        />
-        保存中…
-      </button>
-    );
-  }
-
-  if (showSaved) {
-    return (
-      <button
-        type="submit"
-        className="px-4 py-2 bg-green-600 text-white rounded transition-colors duration-300"
-      >
-        ✓ 保存しました
-      </button>
-    );
-  }
-
-  if (showError) {
-    return (
-      <button
-        type="submit"
-        className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-      >
-        ✕ 保存失敗（再試行）
-      </button>
-    );
-  }
-
-  return (
-    <button
-      type="submit"
-      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-    >
-      保存
-    </button>
-  );
-}
+export type SavePromptState = ActionResult;
 
 export function PromptForm({
   defaultBody,
@@ -125,10 +50,7 @@ export function PromptForm({
             </p>
           )}
         </div>
-        <SubmitButton
-          lastSavedAt={state?.ok === true ? state.ts : null}
-          lastErrorAt={state?.ok === false ? state.ts : null}
-        />
+        <StatefulSaveButton result={state} />
       </div>
     </form>
   );
