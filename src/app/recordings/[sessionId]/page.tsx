@@ -73,6 +73,29 @@ export default async function RecordingDetailPage({
     items: Record<string, unknown>;
     proposed_at: string;
   }>;
+
+  const { data: linkedOrdersData } = await supabase
+    .from("recording_orders")
+    .select(
+      "id,order_number,status_code,status_label,total_amount,payment_method,recipient_name,shipping_date,delivery_date,next_delivery_date,product_names,product_groups,selected_at"
+    )
+    .eq("session_id", params.sessionId)
+    .order("selected_at", { ascending: false });
+  const linkedOrders = (linkedOrdersData ?? []) as Array<{
+    id: string;
+    order_number: string | null;
+    status_code: number | null;
+    status_label: string | null;
+    total_amount: string | null;
+    payment_method: string | null;
+    recipient_name: string | null;
+    shipping_date: string | null;
+    delivery_date: string | null;
+    next_delivery_date: string | null;
+    product_names: string[] | null;
+    product_groups: string[] | null;
+    selected_at: string;
+  }>;
   let displayName = data.operator_email ?? "未設定";
   if (data.operator_email) {
     const { data: role } = await supabase
@@ -198,6 +221,68 @@ export default async function RecordingDetailPage({
                 </div>
               </div>
             ))}
+          </div>
+        )}
+      </section>
+
+      <section className="bg-white rounded shadow p-4">
+        <h2 className="font-semibold mb-2">紐付け受注</h2>
+        {linkedOrders.length === 0 ? (
+          <p className="text-sm text-gray-500">この録音にひもづく受注はまだ登録されていません。</p>
+        ) : (
+          <div className="space-y-3">
+            {linkedOrders.map((order) => {
+              const groups = order.product_groups ?? [];
+              const names = order.product_names ?? [];
+              const meta: string[] = [];
+              if (order.total_amount) meta.push(order.total_amount);
+              if (order.payment_method) meta.push(order.payment_method);
+              if (order.recipient_name) meta.push(order.recipient_name);
+              return (
+                <div key={order.id} className="border rounded p-3">
+                  <div className="flex flex-wrap items-baseline gap-2">
+                    <span className="font-semibold text-sm">
+                      {order.order_number ? `受注 ${order.order_number}` : "受注 (番号不明)"}
+                    </span>
+                    {(order.status_code !== null || order.status_label) && (
+                      <span className="text-xs text-gray-600">
+                        {order.status_code !== null ? `${order.status_code}: ` : ""}
+                        {order.status_label ?? ""}
+                      </span>
+                    )}
+                    <span className="ml-auto text-xs text-gray-400">
+                      登録 {formatDateTime(order.selected_at)}
+                    </span>
+                  </div>
+                  {groups.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5 items-center">
+                      <span className="text-xs text-gray-500">商品グループ:</span>
+                      {groups.map((g) => (
+                        <span
+                          key={g}
+                          className={`text-xs px-2 py-0.5 rounded border ${g === "未分類" ? "bg-gray-100 text-gray-600 border-gray-300" : "bg-emerald-100 text-emerald-800 border-emerald-300"}`}
+                        >
+                          {g}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {names.length > 0 && (
+                    <div className="mt-1 text-xs text-gray-500">
+                      商品: {names.join(" / ")}
+                    </div>
+                  )}
+                  {meta.length > 0 && (
+                    <div className="mt-1 text-xs text-gray-500">{meta.join(" / ")}</div>
+                  )}
+                  <div className="mt-1 text-xs text-gray-500">
+                    {order.shipping_date && <span>出荷予定 {order.shipping_date} / </span>}
+                    {order.delivery_date && <span>配達 {order.delivery_date} / </span>}
+                    {order.next_delivery_date && <span>次回 {order.next_delivery_date}</span>}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </section>
