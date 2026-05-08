@@ -435,7 +435,8 @@ export default async function RecordingsPage({
               <th className="px-3 py-2">対応者</th>
               <th className="px-3 py-2">タイトル</th>
               <th className="px-3 py-2">商品</th>
-              <th className="px-3 py-2">紐付け受注</th>
+              <th className="px-3 py-2">商品グループ</th>
+              <th className="px-3 py-2">受注番号</th>
               <th className="px-3 py-2">内容</th>
               <th className="px-3 py-2">提案成功</th>
               <th className="px-3 py-2">ステータス</th>
@@ -484,28 +485,39 @@ export default async function RecordingsPage({
                   <td className="px-3 py-2">
                     {(() => {
                       const linked = linkedOrdersBySession.get(r.session_id);
-                      if (!linked || (linked.orderNumbers.length === 0 && linked.productGroups.length === 0)) {
+                      if (!linked || linked.productGroups.length === 0) {
                         return <span className="text-gray-300 text-xs">-</span>;
                       }
                       return (
-                        <div className="flex flex-col gap-1">
-                          {linked.productGroups.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
-                              {linked.productGroups.map((g) => (
-                                <span
-                                  key={g}
-                                  className={`text-xs px-1.5 py-0.5 rounded border whitespace-nowrap ${g === "未分類" ? "bg-gray-100 text-gray-600 border-gray-300" : "bg-emerald-100 text-emerald-800 border-emerald-300"}`}
-                                >
-                                  {g}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                          {linked.orderNumbers.length > 0 && (
-                            <div className="text-xs text-gray-500 truncate" title={linked.orderNumbers.join(", ")}>
-                              #{linked.orderNumbers.join(", #")}
-                            </div>
-                          )}
+                        <div className="flex flex-wrap gap-1">
+                          {linked.productGroups.map((g) => (
+                            <span
+                              key={g}
+                              className={`text-xs px-1.5 py-0.5 rounded border whitespace-nowrap ${g === "未分類" ? "bg-gray-100 text-gray-600 border-gray-300" : "bg-emerald-100 text-emerald-800 border-emerald-300"}`}
+                            >
+                              {g}
+                            </span>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </td>
+                  <td className="px-3 py-2">
+                    {(() => {
+                      const linked = linkedOrdersBySession.get(r.session_id);
+                      if (!linked || linked.orderNumbers.length === 0) {
+                        return <span className="text-gray-300 text-xs">-</span>;
+                      }
+                      return (
+                        <div
+                          className="flex flex-col gap-0.5 text-xs font-mono text-gray-700"
+                          title={linked.orderNumbers.join("\n")}
+                        >
+                          {linked.orderNumbers.map((num) => (
+                            <span key={num} className="whitespace-nowrap">
+                              {num}
+                            </span>
+                          ))}
                         </div>
                       );
                     })()}
@@ -542,7 +554,7 @@ export default async function RecordingsPage({
             })}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={11} className="px-3 py-8 text-center text-gray-500">
+                <td colSpan={12} className="px-3 py-8 text-center text-gray-500">
                   該当する録音がありません
                 </td>
               </tr>
