@@ -20,7 +20,7 @@ import { NextResponse } from "next/server";
  */
 
 const DEFAULT_SHEET_ID = "1n2RCWATHm72djYV1NJqd2pALA54eBoIGGC-TpdqHBXE";
-const DEFAULT_SHEET_GID = "0";
+const DEFAULT_SHEET_NAME = "data";
 
 // Re-fetch the upstream sheet at most once a day. The widget caches its own
 // copy for 7 days, so the operator-facing freshness window is bounded by the
@@ -34,8 +34,11 @@ type ProductGroupItem = {
 
 export async function GET(): Promise<NextResponse> {
   const sheetId = process.env.PRODUCT_GROUPS_SHEET_ID ?? DEFAULT_SHEET_ID;
-  const sheetGid = process.env.PRODUCT_GROUPS_SHEET_GID ?? DEFAULT_SHEET_GID;
-  const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${sheetGid}`;
+  const sheetName = process.env.PRODUCT_GROUPS_SHEET_NAME ?? DEFAULT_SHEET_NAME;
+  // gviz endpoint takes a sheet *name* directly, which is more durable than
+  // a numeric gid — the SKU↔group sheet has a stable "data" tab next to the
+  // SQL helper sheet, and we only ever want the data tab.
+  const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
 
   let csvText: string;
   try {
@@ -74,7 +77,7 @@ export async function GET(): Promise<NextResponse> {
     NextResponse.json({
       updated_at: new Date().toISOString(),
       sheet_id: sheetId,
-      sheet_gid: sheetGid,
+      sheet_name: sheetName,
       count: items.length,
       items,
     })
