@@ -3,40 +3,16 @@ import { requireAdmin } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { PROPOSAL_ITEMS } from "@/lib/proposal/items";
 import { fetchProducts } from "@/lib/products/queries";
+import {
+  buildSearchParams,
+  fetchFilteredRecordings,
+  fetchKnownProductGroups,
+  parseRecordingsFilterFromSearchParams,
+  type Recording,
+} from "@/lib/recordings/queries";
+import { FilterPanel } from "./_components/FilterPanel";
 
 export const dynamic = "force-dynamic";
-
-type Recording = {
-  id: string;
-  session_id: string;
-  started_at: string;
-  ended_at: string | null;
-  duration_sec: number | null;
-  operator_email: string | null;
-  status: string;
-  transcripts: Array<{
-    title: string | null;
-    summary: string | null;
-    merged_text: string | null;
-    products: string[] | null;
-  }>;
-};
-
-type UserRoleRow = {
-  email: string;
-  display_name: string | null;
-};
-
-type ProposalRow = {
-  session_id: string;
-  items: Record<string, unknown>;
-};
-
-type RecordingOrderRow = {
-  session_id: string;
-  order_number: string | null;
-  product_groups: string[] | null;
-};
 
 const PROPOSAL_LABEL_BY_KEY = new Map(PROPOSAL_ITEMS.map((p) => [p.key, p.label]));
 
@@ -63,369 +39,69 @@ function operatorDisplayName(
   return email.split("@")[0];
 }
 
-function truncate(text: string | null, max = 80): string {
-  if (!text) return "";
-  const oneLine = text.replace(/\s+/g, " ").trim();
-  return oneLine.length > max ? `${oneLine.slice(0, max)}…` : oneLine;
-}
-
-function asArray(value: string | string[] | undefined): string[] {
-  if (Array.isArray(value)) return value.filter(Boolean);
-  if (typeof value === "string" && value) return [value];
-  return [];
-}
-
-function buildHref(
-  base: string,
-  params: Record<string, string | undefined>,
-  successKeys: string[],
-  productNames: string[] = []
-): string {
+function searchParamsToURLSearchParams(
+  searchParams: Record<string, string | string[] | undefined>
+): URLSearchParams {
   const sp = new URLSearchParams();
-  for (const [k, v] of Object.entries(params)) if (v) sp.set(k, v);
-  for (const k of successKeys) sp.append("success", k);
-  for (const p of productNames) sp.append("product", p);
-  return `${base}?${sp.toString()}`;
+  for (const [k, v] of Object.entries(searchParams)) {
+    if (v === undefined) continue;
+    if (Array.isArray(v)) for (const item of v) sp.append(k, item);
+    else sp.append(k, v);
+  }
+  return sp;
 }
 
 export default async function RecordingsPage({
   searchParams,
 }: {
-  searchParams: {
-    page?: string;
-    q?: string;
-    operator?: string;
-    success?: string | string[];
-    match?: string;
-    product?: string | string[];
-    product_match?: string;
-  };
+  searchParams: Record<string, string | string[] | undefined>;
 }) {
   await requireAdmin();
   const supabase = createClient();
 
-  const successFilter = asArray(searchParams.success);
-  const matchMode: "and" | "or" = searchParams.match === "or" ? "or" : "and";
-  const productFilter = asArray(searchParams.product);
-  const productMatchMode: "and" | "or" =
-    searchParams.product_match === "or" ? "or" : "and";
-  const page = Math.max(1, parseInt(searchParams.page ?? "1", 10) || 1);
+  const sp = searchParamsToURLSearchParams(searchParams);
+  const filter = parseRecordingsFilterFromSearchParams(sp);
+  const page = Math.max(1, parseInt((searchParams.page as string) ?? "1", 10) || 1);
   const pageSize = 50;
   const from = (page - 1) * pageSize;
-  const to = from + pageSize - 1;
 
-  // If the user filtered by successful proposal items, narrow recordings via
-  // the proposals table first.
-  // - AND: every selected key must be "1" on the SAME proposals row
-  // - OR : at least one selected key must be "1" on ANY proposals row
-  let allowedSessionIds: string[] | null = null;
-  if (successFilter.length > 0) {
-    let pq = supabase.from("proposals").select("session_id");
-    if (matchMode === "and") {
-      for (const key of successFilter) {
-        pq = pq.eq(`items->>${key}`, "1");
-      }
-    } else {
-      const orClause = successFilter
-        .map((key) => `items->>${key}.eq.1`)
-        .join(",");
-      pq = pq.or(orClause);
-    }
-    const { data: matched, error: pqErr } = await pq;
-    if (pqErr) {
-      return <p className="text-red-600">エラー: {pqErr.message}</p>;
-    }
-    allowedSessionIds = Array.from(
-      new Set((matched ?? []).map((m: { session_id: string }) => m.session_id))
-    );
-    if (allowedSessionIds.length === 0) {
-      // Render the form + empty state without hitting recordings at all.
-      return renderEmpty(searchParams, successFilter, matchMode);
-    }
-  }
-
-  // Narrow recordings further by product names mentioned in the call.
-  // - AND: transcripts.products must contain every selected name (`@>`)
-  // - OR : transcripts.products must overlap any selected name (`&&`)
-  let allowedRecordingIds: string[] | null = null;
-  if (productFilter.length > 0) {
-    let tq = supabase.from("transcripts").select("recording_id");
-    if (productMatchMode === "and") {
-      tq = tq.contains("products", productFilter);
-    } else {
-      tq = tq.overlaps("products", productFilter);
-    }
-    const { data: matchedTrans, error: tqErr } = await tq;
-    if (tqErr) {
-      return <p className="text-red-600">エラー: {tqErr.message}</p>;
-    }
-    allowedRecordingIds = Array.from(
-      new Set((matchedTrans ?? []).map((m: { recording_id: string }) => m.recording_id))
-    );
-    if (allowedRecordingIds.length === 0) {
-      return renderEmpty(searchParams, successFilter, matchMode);
-    }
-  }
-
-  let query = supabase
-    .from("recordings")
-    .select(
-      "id,session_id,started_at,ended_at,duration_sec,operator_email,status,transcripts(title,summary,merged_text,products)",
-      { count: "exact" }
-    )
-    .order("started_at", { ascending: false })
-    .range(from, to);
-
-  if (searchParams.operator) {
-    query = query.ilike("operator_email", `%${searchParams.operator}%`);
-  }
-  if (allowedSessionIds) {
-    query = query.in("session_id", allowedSessionIds);
-  }
-  if (allowedRecordingIds) {
-    query = query.in("id", allowedRecordingIds);
-  }
-
-  const { data: recordings, count, error } = await query;
-  if (error) {
-    return <p className="text-red-600">エラー: {error.message}</p>;
-  }
-
-  const sessionIds = (recordings ?? []).map((r: Recording) => r.session_id);
-
-  // Pull proposals for the visible page so we can render a "提案成功" column
-  // even when no filter is active.
-  let proposalsBySession = new Map<string, Set<string>>();
-  if (sessionIds.length > 0) {
-    const { data: proposalRows } = await supabase
-      .from("proposals")
-      .select("session_id,items")
-      .in("session_id", sessionIds);
-    for (const p of (proposalRows ?? []) as ProposalRow[]) {
-      const set = proposalsBySession.get(p.session_id) ?? new Set<string>();
-      for (const [k, v] of Object.entries(p.items ?? {})) {
-        if (v === "1") set.add(k);
-      }
-      proposalsBySession.set(p.session_id, set);
-    }
-  }
-
-  // Pull linked orders for the visible page so the table can show the order
-  // numbers and product groups the operator picked in the widget.
-  type LinkedOrderSummary = {
-    orderNumbers: string[];
-    productGroups: string[];
-  };
-  const linkedOrdersBySession = new Map<string, LinkedOrderSummary>();
-  if (sessionIds.length > 0) {
-    const { data: linkedRows } = await supabase
-      .from("recording_orders")
-      .select("session_id,order_number,product_groups")
-      .in("session_id", sessionIds);
-    for (const row of (linkedRows ?? []) as RecordingOrderRow[]) {
-      const entry =
-        linkedOrdersBySession.get(row.session_id) ??
-        ({ orderNumbers: [], productGroups: [] } as LinkedOrderSummary);
-      if (row.order_number) entry.orderNumbers.push(row.order_number);
-      for (const g of row.product_groups ?? []) {
-        if (g && !entry.productGroups.includes(g)) entry.productGroups.push(g);
-      }
-      linkedOrdersBySession.set(row.session_id, entry);
-    }
-  }
-
-  const emails = Array.from(
-    new Set((recordings ?? []).map((r: Recording) => r.operator_email).filter((e): e is string => Boolean(e)))
-  );
-  let byEmail = new Map<string, string | null>();
-  if (emails.length > 0) {
-    const { data: roles } = await supabase
-      .from("user_roles")
-      .select("email,display_name")
-      .in("email", emails);
-    byEmail = new Map((roles ?? []).map((r: UserRoleRow) => [r.email, r.display_name]));
-  }
-
-  const filtered = (recordings ?? []).filter((r: Recording) => {
-    if (!searchParams.q) return true;
-    const needle = searchParams.q.toLowerCase();
-    const title = r.transcripts?.[0]?.title ?? "";
-    return title.toLowerCase().includes(needle);
-  });
+  const { rows, count, proposalsBySession, linkedOrdersBySession, displayNamesByEmail } =
+    await fetchFilteredRecordings(supabase, filter, { page, pageSize });
 
   const totalPages = count ? Math.ceil(count / pageSize) : 1;
-  const baseParams = {
-    q: searchParams.q,
-    operator: searchParams.operator,
-    match: matchMode === "or" ? "or" : undefined,
-    product_match: productMatchMode === "or" ? "or" : undefined,
-  };
-
-  // Product master used to render the filter checkbox list.
   const productMaster = await fetchProducts(false);
+  const productGroupMaster = await fetchKnownProductGroups(supabase);
+
+  const csvHref = `/api/recordings/export?${buildSearchParams(filter).toString()}`;
+  const prevHref = `/recordings?${buildSearchParams(filter, { page: String(page - 1) }).toString()}`;
+  const nextHref = `/recordings?${buildSearchParams(filter, { page: String(page + 1) }).toString()}`;
 
   return (
     <section>
       <h1 className="text-2xl font-bold mb-4">録音一覧</h1>
-      <form className="space-y-3 mb-4 text-sm bg-white rounded shadow p-4" action="/recordings">
-        <div className="flex flex-wrap gap-3 items-center">
-          <input
-            name="q"
-            defaultValue={searchParams.q ?? ""}
-            placeholder="タイトル検索"
-            className="px-3 py-2 border rounded"
-          />
-          <input
-            name="operator"
-            defaultValue={searchParams.operator ?? ""}
-            placeholder="対応者メアド部分一致"
-            className="px-3 py-2 border rounded"
-          />
-          <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded">
-            検索
-          </button>
-          {(successFilter.length > 0 || productFilter.length > 0) && (
-            <Link href="/recordings" className="text-xs text-gray-500 hover:underline">
-              フィルタをすべてクリア
-            </Link>
-          )}
-        </div>
 
-        <details open={successFilter.length > 0}>
-          <summary className="cursor-pointer text-sm text-gray-700 hover:text-gray-900 select-none">
-            提案成功で絞り込み（複数選択可）
-            {successFilter.length > 0 && (
-              <span className="ml-2 text-xs text-blue-600">
-                {successFilter.length}項目選択中（{matchMode === "or" ? "OR" : "AND"}）
-              </span>
-            )}
-          </summary>
-          <div className="mt-3 flex items-center gap-4 text-xs">
-            <span className="text-gray-600">マッチ条件:</span>
-            <label className="flex items-center gap-1 cursor-pointer">
-              <input
-                type="radio"
-                name="match"
-                value="and"
-                defaultChecked={matchMode === "and"}
-                className="accent-blue-600"
-              />
-              <span>AND（全部成功）</span>
-            </label>
-            <label className="flex items-center gap-1 cursor-pointer">
-              <input
-                type="radio"
-                name="match"
-                value="or"
-                defaultChecked={matchMode === "or"}
-                className="accent-blue-600"
-              />
-              <span>OR（いずれか成功）</span>
-            </label>
-          </div>
-          <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-            {PROPOSAL_ITEMS.map((item) => {
-              const checked = successFilter.includes(item.key);
-              return (
-                <label
-                  key={item.key}
-                  className={`flex items-center gap-1.5 px-2 py-1 border rounded cursor-pointer text-xs ${
-                    checked
-                      ? "bg-green-100 border-green-300 text-green-800"
-                      : "border-gray-200 hover:bg-gray-50"
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    name="success"
-                    value={item.key}
-                    defaultChecked={checked}
-                    className="accent-green-600"
-                  />
-                  <span>{item.label}</span>
-                </label>
-              );
-            })}
-          </div>
-        </details>
-
-        <details open={productFilter.length > 0}>
-          <summary className="cursor-pointer text-sm text-gray-700 hover:text-gray-900 select-none">
-            商品で絞り込み（複数選択可）
-            {productFilter.length > 0 && (
-              <span className="ml-2 text-xs text-blue-600">
-                {productFilter.length}項目選択中（{productMatchMode === "or" ? "OR" : "AND"}）
-              </span>
-            )}
-          </summary>
-          <div className="mt-3 flex items-center gap-4 text-xs">
-            <span className="text-gray-600">マッチ条件:</span>
-            <label className="flex items-center gap-1 cursor-pointer">
-              <input
-                type="radio"
-                name="product_match"
-                value="and"
-                defaultChecked={productMatchMode === "and"}
-                className="accent-blue-600"
-              />
-              <span>AND（全部含む）</span>
-            </label>
-            <label className="flex items-center gap-1 cursor-pointer">
-              <input
-                type="radio"
-                name="product_match"
-                value="or"
-                defaultChecked={productMatchMode === "or"}
-                className="accent-blue-600"
-              />
-              <span>OR（いずれか含む）</span>
-            </label>
-          </div>
-          <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-            {productMaster.map((p) => {
-              const checked = productFilter.includes(p.name);
-              return (
-                <label
-                  key={p.id}
-                  className={`flex items-center gap-1.5 px-2 py-1 border rounded cursor-pointer text-xs ${
-                    checked
-                      ? "bg-blue-100 border-blue-300 text-blue-800"
-                      : "border-gray-200 hover:bg-gray-50"
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    name="product"
-                    value={p.name}
-                    defaultChecked={checked}
-                    className="accent-blue-600"
-                  />
-                  <span>{p.name}</span>
-                </label>
-              );
-            })}
-            {productMaster.length === 0 && (
-              <p className="col-span-full text-xs text-gray-500">
-                商品マスターが空です。/products から商品を追加してください。
-              </p>
-            )}
-          </div>
-        </details>
-      </form>
+      <FilterPanel
+        filter={filter}
+        productMaster={productMaster}
+        productGroupMaster={productGroupMaster}
+        csvHref={csvHref}
+      />
 
       <div className="bg-white rounded shadow overflow-x-auto">
         <table className="w-full text-sm table-fixed">
           <colgroup>
-            <col className="w-[140px]" />
-            <col className="w-[64px]" />
-            <col className="w-[100px]" />
-            <col className="w-[100px]" />
-            <col className="w-[260px]" />
-            <col className="w-[200px]" />
-            <col className="w-auto" />
-            <col className="w-[200px]" />
-            <col className="w-[110px]" />
-            <col className="w-[60px]" />
+            <col className="w-[140px]" />{/* 録音日時 */}
+            <col className="w-[64px]" />{/* 時間 */}
+            <col className="w-[100px]" />{/* セッションID */}
+            <col className="w-[110px]" />{/* 対応者 */}
+            <col className="w-[240px]" />{/* タイトル */}
+            <col className="w-[180px]" />{/* 商品 */}
+            <col className="w-[180px]" />{/* 商品グループ */}
+            <col className="w-[140px]" />{/* 受注番号 */}
+            <col className="w-[280px]" />{/* 内容 */}
+            <col className="w-[140px]" />{/* 提案成功 */}
+            <col className="w-[100px]" />{/* ステータス */}
+            <col className="w-[60px]" />{/* 操作 */}
           </colgroup>
           <thead className="bg-gray-100 text-left sticky top-0 z-10">
             <tr>
@@ -444,7 +120,7 @@ export default async function RecordingsPage({
             </tr>
           </thead>
           <tbody>
-            {filtered.map((r: Recording) => {
+            {rows.map((r: Recording) => {
               const transcript = r.transcripts?.[0];
               const successKeys = Array.from(proposalsBySession.get(r.session_id) ?? []);
               const titleText = transcript?.title ?? "-";
@@ -455,7 +131,7 @@ export default async function RecordingsPage({
                   <td className="px-3 py-2 whitespace-nowrap">{formatDuration(r.duration_sec)}</td>
                   <td className="px-3 py-2 font-mono text-xs truncate">{r.session_id.slice(0, 8)}…</td>
                   <td className="px-3 py-2 truncate" title={r.operator_email ?? ""}>
-                    {operatorDisplayName(r.operator_email, byEmail)}
+                    {operatorDisplayName(r.operator_email, displayNamesByEmail)}
                   </td>
                   <td className="px-3 py-2 truncate" title={titleText}>
                     {titleText}
@@ -468,12 +144,7 @@ export default async function RecordingsPage({
                         {(transcript?.products ?? []).map((name) => (
                           <Link
                             key={name}
-                            href={buildHref(
-                              "/recordings",
-                              { product_match: "or" },
-                              [],
-                              [name]
-                            )}
+                            href={`/recordings?${buildSearchParams({ products: [name], productMatch: "or" }).toString()}`}
                             className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-300 hover:bg-blue-200 whitespace-nowrap"
                           >
                             {name}
@@ -491,12 +162,13 @@ export default async function RecordingsPage({
                       return (
                         <div className="flex flex-wrap gap-1">
                           {linked.productGroups.map((g) => (
-                            <span
+                            <Link
                               key={g}
-                              className={`text-xs px-1.5 py-0.5 rounded border whitespace-nowrap ${g === "未分類" ? "bg-gray-100 text-gray-600 border-gray-300" : "bg-emerald-100 text-emerald-800 border-emerald-300"}`}
+                              href={`/recordings?${buildSearchParams({ productGroups: [g], productGroupMatch: "or" }).toString()}`}
+                              className={`text-xs px-1.5 py-0.5 rounded border whitespace-nowrap ${g === "未分類" ? "bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200" : "bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-200"}`}
                             >
                               {g}
-                            </span>
+                            </Link>
                           ))}
                         </div>
                       );
@@ -522,8 +194,8 @@ export default async function RecordingsPage({
                       );
                     })()}
                   </td>
-                  <td className="px-3 py-2 text-xs leading-snug" title={summaryText}>
-                    {truncate(summaryText, 120) || "-"}
+                  <td className="px-3 py-2 text-xs truncate" title={summaryText}>
+                    {summaryText || "-"}
                   </td>
                   <td className="px-3 py-2">
                     {successKeys.length === 0 ? (
@@ -552,7 +224,7 @@ export default async function RecordingsPage({
                 </tr>
               );
             })}
-            {filtered.length === 0 && (
+            {rows.length === 0 && (
               <tr>
                 <td colSpan={12} className="px-3 py-8 text-center text-gray-500">
                   該当する録音がありません
@@ -565,51 +237,21 @@ export default async function RecordingsPage({
 
       <div className="mt-4 flex items-center justify-between text-sm">
         <span>
-          {count ?? 0} 件中 {from + 1}-{Math.min(to + 1, count ?? 0)}
+          {count} 件中 {count === 0 ? 0 : from + 1}-{Math.min(from + pageSize, count)}
         </span>
         <div className="flex gap-2">
           {page > 1 && (
-            <Link
-              href={buildHref("/recordings", { ...baseParams, page: String(page - 1) }, successFilter, productFilter)}
-              className="px-3 py-1 border rounded"
-            >
+            <Link href={prevHref} className="px-3 py-1 border rounded">
               前へ
             </Link>
           )}
           {page < totalPages && (
-            <Link
-              href={buildHref("/recordings", { ...baseParams, page: String(page + 1) }, successFilter, productFilter)}
-              className="px-3 py-1 border rounded"
-            >
+            <Link href={nextHref} className="px-3 py-1 border rounded">
               次へ
             </Link>
           )}
         </div>
       </div>
-    </section>
-  );
-}
-
-function renderEmpty(
-  searchParams: { q?: string; operator?: string },
-  successFilter: string[],
-  matchMode: "and" | "or"
-) {
-  return (
-    <section>
-      <h1 className="text-2xl font-bold mb-4">録音一覧</h1>
-      <p className="text-sm text-gray-600 mb-4">
-        指定された絞り込み条件に一致する録音は見つかりませんでした。
-      </p>
-      <Link
-        href={buildHref("/recordings", { q: searchParams.q, operator: searchParams.operator }, [])}
-        className="text-blue-600 hover:underline text-sm"
-      >
-        フィルタをクリア
-      </Link>
-      <p className="text-xs text-gray-500 mt-2">
-        絞り込み中（{matchMode === "or" ? "OR" : "AND"}）: {successFilter.join(", ")}
-      </p>
     </section>
   );
 }
