@@ -32,6 +32,12 @@ type ProposalRow = {
   items: Record<string, unknown>;
 };
 
+type RecordingOrderRow = {
+  session_id: string;
+  order_number: string | null;
+  product_groups: string[] | null;
+};
+
 const PROPOSAL_LABEL_BY_KEY = new Map(PROPOSAL_ITEMS.map((p) => [p.key, p.label]));
 
 function formatDuration(sec: number | null): string {
@@ -201,6 +207,30 @@ export default async function RecordingsPage({
         if (v === "1") set.add(k);
       }
       proposalsBySession.set(p.session_id, set);
+    }
+  }
+
+  // Pull linked orders for the visible page so the table can show the order
+  // numbers and product groups the operator picked in the widget.
+  type LinkedOrderSummary = {
+    orderNumbers: string[];
+    productGroups: string[];
+  };
+  const linkedOrdersBySession = new Map<string, LinkedOrderSummary>();
+  if (sessionIds.length > 0) {
+    const { data: linkedRows } = await supabase
+      .from("recording_orders")
+      .select("session_id,order_number,product_groups")
+      .in("session_id", sessionIds);
+    for (const row of (linkedRows ?? []) as RecordingOrderRow[]) {
+      const entry =
+        linkedOrdersBySession.get(row.session_id) ??
+        ({ orderNumbers: [], productGroups: [] } as LinkedOrderSummary);
+      if (row.order_number) entry.orderNumbers.push(row.order_number);
+      for (const g of row.product_groups ?? []) {
+        if (g && !entry.productGroups.includes(g)) entry.productGroups.push(g);
+      }
+      linkedOrdersBySession.set(row.session_id, entry);
     }
   }
 
@@ -405,6 +435,7 @@ export default async function RecordingsPage({
               <th className="px-3 py-2">対応者</th>
               <th className="px-3 py-2">タイトル</th>
               <th className="px-3 py-2">商品</th>
+              <th className="px-3 py-2">紐付け受注</th>
               <th className="px-3 py-2">内容</th>
               <th className="px-3 py-2">提案成功</th>
               <th className="px-3 py-2">ステータス</th>
@@ -450,6 +481,35 @@ export default async function RecordingsPage({
                       </div>
                     )}
                   </td>
+                  <td className="px-3 py-2">
+                    {(() => {
+                      const linked = linkedOrdersBySession.get(r.session_id);
+                      if (!linked || (linked.orderNumbers.length === 0 && linked.productGroups.length === 0)) {
+                        return <span className="text-gray-300 text-xs">-</span>;
+                      }
+                      return (
+                        <div className="flex flex-col gap-1">
+                          {linked.productGroups.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {linked.productGroups.map((g) => (
+                                <span
+                                  key={g}
+                                  className={`text-xs px-1.5 py-0.5 rounded border whitespace-nowrap ${g === "未分類" ? "bg-gray-100 text-gray-600 border-gray-300" : "bg-emerald-100 text-emerald-800 border-emerald-300"}`}
+                                >
+                                  {g}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {linked.orderNumbers.length > 0 && (
+                            <div className="text-xs text-gray-500 truncate" title={linked.orderNumbers.join(", ")}>
+                              #{linked.orderNumbers.join(", #")}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </td>
                   <td className="px-3 py-2 text-xs leading-snug" title={summaryText}>
                     {truncate(summaryText, 120) || "-"}
                   </td>
@@ -482,7 +542,7 @@ export default async function RecordingsPage({
             })}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={10} className="px-3 py-8 text-center text-gray-500">
+                <td colSpan={11} className="px-3 py-8 text-center text-gray-500">
                   該当する録音がありません
                 </td>
               </tr>
