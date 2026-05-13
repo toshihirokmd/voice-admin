@@ -18,6 +18,7 @@ const HEADERS = [
   "対応者表示名",
   "タイトル",
   "要約",
+  "書き起こし全文",
   "商品",
   "商品グループ",
   "受注番号",
@@ -53,9 +54,12 @@ function flatten(arr: readonly string[] | null | undefined): string {
   return (arr ?? []).filter(Boolean).join(";");
 }
 
-function normalizeMultiline(text: string | null | undefined): string {
+// Excel など各種 CSV reader が確実に1セル内に収まるよう、改行は LF に正規化
+// (CR を除去し、ダブル空行を抑制)。csvEscape が自動でダブルクォート囲みするので
+// 内部改行はセル内改行として正しく扱われる。
+function preserveFulltext(text: string | null | undefined): string {
   if (!text) return "";
-  return text.replace(/\r?\n/g, " ").replace(/\s+/g, " ").trim();
+  return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\n{3,}/g, "\n\n");
 }
 
 export function buildRecordingsCsv(rows: CsvRowInput[]): string {
@@ -74,7 +78,8 @@ export function buildRecordingsCsv(rows: CsvRowInput[]): string {
       r.operator_email ?? "",
       displayName,
       transcript?.title ?? "",
-      normalizeMultiline(transcript?.summary),
+      preserveFulltext(transcript?.summary),
+      preserveFulltext(transcript?.merged_text),
       flatten(transcript?.products),
       flatten(linkedOrders?.productGroups),
       flatten(linkedOrders?.orderNumbers),
