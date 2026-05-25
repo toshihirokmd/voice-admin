@@ -16,6 +16,11 @@ export const dynamic = "force-dynamic";
 
 const PROPOSAL_LABEL_BY_KEY = new Map(PROPOSAL_ITEMS.map((p) => [p.key, p.label]));
 
+// 商品列の表示フラグ。受注紐付けの進捗を優先したいので一旦 false。
+// 将来また見たくなったら true に戻すだけで復活する (col/th/td 3 か所が同時に出る)。
+// 2026-05-25
+const SHOW_PRODUCTS_COLUMN = false;
+
 function formatDuration(sec: number | null): string {
   if (sec == null) return "-";
   const m = Math.floor(sec / 60);
@@ -87,7 +92,10 @@ export default async function RecordingsPage({
         csvHref={csvHref}
       />
 
-      <div className="bg-white rounded shadow overflow-x-auto">
+      <p className="text-xs text-gray-500 mb-1">
+        ※ 画面に収まらない列は、表の下にあるスクロールバーで横にスクロールすると見えます（受注番号・提案成功・ステータス・操作 など右側にあります）。
+      </p>
+      <div className="bg-white rounded shadow overflow-x-scroll">
         <table className="w-full text-sm table-fixed">
           <colgroup>
             <col className="w-[140px]" />{/* 録音日時 */}
@@ -95,7 +103,7 @@ export default async function RecordingsPage({
             <col className="w-[100px]" />{/* セッションID */}
             <col className="w-[110px]" />{/* 対応者 */}
             <col className="w-[240px]" />{/* タイトル */}
-            <col className="w-[180px]" />{/* 商品 */}
+            {SHOW_PRODUCTS_COLUMN && <col className="w-[180px]" />/* 商品 */}
             <col className="w-[180px]" />{/* 商品グループ */}
             <col className="w-[140px]" />{/* 受注番号 */}
             <col className="w-[280px]" />{/* 内容 */}
@@ -110,7 +118,7 @@ export default async function RecordingsPage({
               <th className="px-3 py-2">セッションID</th>
               <th className="px-3 py-2">対応者</th>
               <th className="px-3 py-2">タイトル</th>
-              <th className="px-3 py-2">商品</th>
+              {SHOW_PRODUCTS_COLUMN && <th className="px-3 py-2">商品</th>}
               <th className="px-3 py-2">商品グループ</th>
               <th className="px-3 py-2">受注番号</th>
               <th className="px-3 py-2">内容</th>
@@ -136,23 +144,25 @@ export default async function RecordingsPage({
                   <td className="px-3 py-2 truncate" title={titleText}>
                     {titleText}
                   </td>
-                  <td className="px-3 py-2">
-                    {(transcript?.products ?? []).length === 0 ? (
-                      <span className="text-gray-300 text-xs">-</span>
-                    ) : (
-                      <div className="flex flex-wrap gap-1">
-                        {(transcript?.products ?? []).map((name) => (
-                          <Link
-                            key={name}
-                            href={`/recordings?${buildSearchParams({ products: [name], productMatch: "or" }).toString()}`}
-                            className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-300 hover:bg-blue-200 whitespace-nowrap"
-                          >
-                            {name}
-                          </Link>
-                        ))}
-                      </div>
-                    )}
-                  </td>
+                  {SHOW_PRODUCTS_COLUMN && (
+                    <td className="px-3 py-2">
+                      {(transcript?.products ?? []).length === 0 ? (
+                        <span className="text-gray-300 text-xs">-</span>
+                      ) : (
+                        <div className="flex flex-wrap gap-1">
+                          {(transcript?.products ?? []).map((name) => (
+                            <Link
+                              key={name}
+                              href={`/recordings?${buildSearchParams({ products: [name], productMatch: "or" }).toString()}`}
+                              className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-300 hover:bg-blue-200 whitespace-nowrap"
+                            >
+                              {name}
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                  )}
                   <td className="px-3 py-2">
                     {(() => {
                       const linked = linkedOrdersBySession.get(r.session_id);
