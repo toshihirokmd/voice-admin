@@ -10,6 +10,8 @@ export interface DashboardData {
   proposalSuccessMonth: { key: string; success: number; proposed: number }[];
   transcriptCountMonth: number;
   displayNamesByEmail: Map<string, string | null>;
+  /** 今月の日別受電数 (date は YYYY-MM-DD・JST、month の 1 日から今日まで全日埋め) */
+  dailyCallsMonth: { date: string; count: number }[];
 }
 
 /**
@@ -47,7 +49,7 @@ export async function fetchDashboardData(
       .not("duration_sec", "is", null),
     supabase
       .from("recordings")
-      .select("operator_email")
+      .select("operator_email,started_at")
       .gte("started_at", monthStart),
     supabase
       .from("transcripts")
@@ -69,13 +71,38 @@ export async function fetchDashboardData(
         )
       : null;
 
-  // オペレーター集計 (今月)
+  // オペレーター集計 (今月) + 日別受電数集計 (同じデータから)
   const operatorCounts = new Map<string, number>();
+  const dailyCountMap = new Map<string, number>();
+  const tokyoFmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
   for (const r of (monthOperatorsRes.data ?? []) as {
     operator_email: string | null;
+    started_at: string;
   }[]) {
     const email = r.operator_email ?? "(unknown)";
     operatorCounts.set(email, (operatorCounts.get(email) ?? 0) + 1);
+    if (r.started_at) {
+      const ymd = tokyoFmt.format(new Date(r.started_at));
+      dailyCountMap.set(ymd, (dailyCountMap.get(ymd) ?? 0) + 1);
+    }
+  }
+
+  // 月初〜今日まで全日埋め (受電 0 件の日も 0 で出す)
+  const monthStartDate = new Date(monthStart);
+  const todayJst = new Date(todayStart);
+  const dailyCallsMonth: { date: string; count: number }[] = [];
+  for (
+    let d = new Date(monthStartDate);
+    d <= todayJst;
+    d.setUTCDate(d.getUTCDate() + 1)
+  ) {
+    const ymd = tokyoFmt.format(d);
+    dailyCallsMonth.push({ date: ymd, count: dailyCountMap.get(ymd) ?? 0 });
   }
   const displayNamesByEmail = new Map<string, string | null>();
   for (const u of (displayNamesRes.data ?? []) as {
@@ -142,6 +169,7 @@ export async function fetchDashboardData(
     proposalSuccessMonth,
     transcriptCountMonth: (monthTranscriptsRes.data ?? []).length,
     displayNamesByEmail,
+    dailyCallsMonth,
   };
 }
 
