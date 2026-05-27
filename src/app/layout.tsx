@@ -33,9 +33,13 @@ export default async function RootLayout({
                 </>
               )}
               {user && (
-                <span className="text-gray-600">
+                <Link
+                  href="/me"
+                  className="text-gray-600 hover:text-gray-900 hover:underline transition"
+                  title="マイページ"
+                >
                   {user.displayName ?? user.email}（{user.role ?? "未設定"}）
-                </span>
+                </Link>
               )}
             </nav>
           </div>
