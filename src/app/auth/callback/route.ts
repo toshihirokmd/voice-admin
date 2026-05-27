@@ -23,18 +23,25 @@ export async function GET(request: Request) {
       return NextResponse.redirect(`${origin}/login?error=domain_not_allowed`);
     }
 
-    // Auto-register operator role if missing (admin promotion is SQL-only).
+    // Auto-register operator role if missing.
+    // 直接 INSERT は RLS で reject されるため、SECURITY DEFINER な RPC 経由で upsert。
     const { data: existing } = await supabase
       .from("user_roles")
       .select("email")
       .eq("email", email)
       .maybeSingle();
     if (!existing) {
-      await supabase.from("user_roles").insert({
-        email,
-        display_name: user?.user_metadata?.full_name ?? null,
-        role: "operator",
-      });
+      const displayName =
+        (user?.user_metadata?.full_name as string | undefined) ??
+        (user?.user_metadata?.name as string | undefined) ??
+        email.split("@")[0];
+      const { error: rpcError } = await supabase.rpc(
+        "rpc_upsert_self_user_role",
+        { p_display_name: displayName }
+      );
+      if (rpcError) {
+        console.error("[auth/callback] auto-register failed:", rpcError);
+      }
     }
   }
 
