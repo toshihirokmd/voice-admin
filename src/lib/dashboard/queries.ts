@@ -18,6 +18,9 @@ export interface DashboardData {
   topOperators: { email: string; displayName: string; count: number }[];
   proposalSuccess: { key: string; success: number; proposed: number }[];
   transcriptCount: number;
+  /** 実 token 使用量の合計 (transcripts.tokens_in/tokens_out) */
+  totalTokensIn: number;
+  totalTokensOut: number;
   displayNamesByEmail: Map<string, string | null>;
   /** 日別受電数 (date は YYYY-MM-DD・JST、range の全日埋め) */
   dailyCalls: { date: string; count: number }[];
@@ -28,7 +31,8 @@ export interface DashboardData {
 /**
  * ダッシュボード用データを一括取得する。SSR 内で 1 回呼ぶ前提。
  * filter で期間と operator を指定。operator 指定時は対象期間の recordings
- * から session_id を集めて transcripts/proposals を IN で絞る。
+ * から recording_id を取得して transcripts を IN 句で絞る。proposals は
+ * operator_email を直接持っているので .eq で絞る。
  */
 export async function fetchDashboardData(
   supabase: SupabaseClient,
@@ -38,24 +42,21 @@ export async function fetchDashboardData(
   const startIso = range.startIso;
   const endIso = range.endExclusiveIso;
 
-  // 今日の数だけは「期間にかかわらず今日」をその場で算出
   const todayStartIso = (() => {
     const today = isoToJstYmd(new Date().toISOString());
     return new Date(`${today}T00:00:00+09:00`).toISOString();
   })();
 
-  // operator 指定時のセッションID取得（transcripts/proposals 絞り込み用）
-  let sessionIds: string[] | null = null;
+  // operator 指定時の recording_id 取得 (transcripts 絞り込み用)
+  let recordingIds: string[] | null = null;
   if (operator) {
-    const sidRes = await supabase
+    const ridRes = await supabase
       .from("recordings")
-      .select("session_id")
+      .select("id")
       .eq("operator_email", operator)
       .gte("started_at", startIso)
       .lt("started_at", endIso);
-    sessionIds = ((sidRes.data ?? []) as { session_id: string }[]).map(
-      (r) => r.session_id
-    );
+    recordingIds = ((ridRes.data ?? []) as { id: string }[]).map((r) => r.id);
   }
 
   // 期間内 件数
@@ -81,7 +82,7 @@ export async function fetchDashboardData(
     return q;
   })();
 
-  // 期間内 recordings (operator + 日別集計用)
+  // 期間内 recordings (オペレーター集計 + 日別集計用)
   const rangeRecordingsBuilder = (() => {
     let q = supabase
       .from("recordings")
@@ -92,29 +93,31 @@ export async function fetchDashboardData(
     return q;
   })();
 
-  // transcripts (期間 + 必要なら session_id IN)
+  // transcripts (recording_id で recordings と紐付け)
+  // operator フィルタ時は recording_id IN (...) で絞る
   const transcriptsBuilder = (() => {
     let q = supabase
       .from("transcripts")
-      .select("products, session_id, created_at")
+      .select("products, recording_id, created_at, tokens_in, tokens_out")
       .gte("created_at", startIso)
       .lt("created_at", endIso);
-    if (sessionIds !== null) {
-      q = q.in("session_id", sessionIds.length === 0 ? ["__none__"] : sessionIds);
+    if (recordingIds !== null) {
+      q = q.in(
+        "recording_id",
+        recordingIds.length === 0 ? ["00000000-0000-0000-0000-000000000000"] : recordingIds
+      );
     }
     return q;
   })();
 
-  // proposals (期間 + 必要なら session_id IN)
+  // proposals は operator_email を持つので直接フィルタ可能
   const proposalsBuilder = (() => {
     let q = supabase
       .from("proposals")
-      .select("items, session_id, proposed_at")
+      .select("items, operator_email, proposed_at")
       .gte("proposed_at", startIso)
       .lt("proposed_at", endIso);
-    if (sessionIds !== null) {
-      q = q.in("session_id", sessionIds.length === 0 ? ["__none__"] : sessionIds);
-    }
+    if (operator) q = q.eq("operator_email", operator);
     return q;
   })();
 
@@ -129,7 +132,6 @@ export async function fetchDashboardData(
     displayNamesRes,
     allOperatorsRes,
   ] = await Promise.all([
-    // 今日 (operator フィルタは適用しない＝KPI として全員)
     supabase
       .from("recordings")
       .select("*", { count: "exact", head: true })
@@ -140,7 +142,6 @@ export async function fetchDashboardData(
     transcriptsBuilder,
     proposalsBuilder,
     supabase.from("user_roles").select("email,display_name"),
-    // operator select 候補（過去 90 日に発信のあった operator）
     supabase
       .from("recordings")
       .select("operator_email")
@@ -194,11 +195,7 @@ export async function fetchDashboardData(
   const dailyCalls: { date: string; count: number }[] = [];
   const startDt = new Date(range.startIso);
   const endDt = new Date(range.endExclusiveIso);
-  for (
-    let d = new Date(startDt);
-    d < endDt;
-    d.setUTCDate(d.getUTCDate() + 1)
-  ) {
+  for (let d = new Date(startDt); d < endDt; d.setUTCDate(d.getUTCDate() + 1)) {
     const ymd = tokyoFmt.format(d);
     dailyCalls.push({ date: ymd, count: dailyCountMap.get(ymd) ?? 0 });
   }
@@ -212,15 +209,22 @@ export async function fetchDashboardData(
     .sort((a, b) => b.count - a.count)
     .slice(0, 5);
 
-  // 商材集計
+  // 商材集計 + 実 token 集計
   const productCounts = new Map<string, number>();
-  for (const t of (rangeTranscriptsRes.data ?? []) as {
+  let totalTokensIn = 0;
+  let totalTokensOut = 0;
+  const transcriptsData = (rangeTranscriptsRes.data ?? []) as {
     products: string[] | null;
-  }[]) {
+    tokens_in: number | null;
+    tokens_out: number | null;
+  }[];
+  for (const t of transcriptsData) {
     for (const p of t.products ?? []) {
       if (!p) continue;
       productCounts.set(p, (productCounts.get(p) ?? 0) + 1);
     }
+    totalTokensIn += t.tokens_in ?? 0;
+    totalTokensOut += t.tokens_out ?? 0;
   }
   const topProducts = [...productCounts.entries()]
     .map(([name, count]) => ({ name, count }))
@@ -241,9 +245,7 @@ export async function fetchDashboardData(
       }
     }
   }
-  const proposalSuccess = [
-    ...new Set([...success.keys(), ...proposed.keys()]),
-  ]
+  const proposalSuccess = [...new Set([...success.keys(), ...proposed.keys()])]
     .map((key) => ({
       key,
       success: success.get(key) ?? 0,
@@ -276,7 +278,9 @@ export async function fetchDashboardData(
     topProducts,
     topOperators,
     proposalSuccess,
-    transcriptCount: (rangeTranscriptsRes.data ?? []).length,
+    transcriptCount: transcriptsData.length,
+    totalTokensIn,
+    totalTokensOut,
     displayNamesByEmail,
     dailyCalls,
     allOperators,

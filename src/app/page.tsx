@@ -61,7 +61,12 @@ export default async function DashboardPage({
     range,
     operator: operator || undefined,
   });
-  const cost = estimateApiCost(data.transcriptCount, data.avgDurationSec);
+  const cost = estimateApiCost(
+    data.transcriptCount,
+    data.avgDurationSec,
+    data.totalTokensIn,
+    data.totalTokensOut
+  );
   const todayYmd = jstTodayYmd();
 
   // recordings へのリンクで使う共通クエリ
@@ -147,11 +152,11 @@ export default async function DashboardPage({
 
         <div
           className="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 rounded-xl p-4"
-          title={`Gemini: $${cost.geminiUsd} (音声$${cost.geminiAudioUsd} + プロンプト$${cost.geminiTextUsd} + 出力$${cost.geminiOutputUsd})\nCloud Run: $${cost.cloudRunUsd} (月額固定$8 + 通話あたり$0.002)\nSupabase: $${cost.supabaseUsd} (月額固定)`}
+          title={`Gemini: $${cost.geminiUsd} (入力$${cost.geminiInputUsd} + 出力$${cost.geminiOutputUsd})\nCloud Run: $${cost.cloudRunUsd} (月額固定$8 + 通話あたり$0.002)\nSupabase: $${cost.supabaseUsd} (月額固定)\nTokens: in ${cost.tokensIn.toLocaleString()} / out ${cost.tokensOut.toLocaleString()}`}
         >
           <div className="flex items-center justify-between">
             <div className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">
-              概算 API 費用
+              API 費用 {cost.source === "actual" ? "(実費)" : "(概算)"}
             </div>
             <div className="w-2 h-2 rounded-full bg-emerald-400" />
           </div>
@@ -160,8 +165,9 @@ export default async function DashboardPage({
           </div>
           <div className="text-[10px] text-emerald-700/70 mt-1 leading-tight space-y-0.5">
             <div>
-              Gemini ${cost.geminiUsd}（{data.transcriptCount}件 × 平均
-              {Math.round(cost.avgDurationSec)}秒）
+              Gemini ${cost.geminiUsd}（{data.transcriptCount}件 /{" "}
+              {(cost.tokensIn / 1000).toFixed(0)}k+
+              {(cost.tokensOut / 1000).toFixed(0)}k tokens）
             </div>
             <div>
               Run ${cost.cloudRunUsd} / Supabase ${cost.supabaseUsd}

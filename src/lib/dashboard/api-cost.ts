@@ -1,45 +1,34 @@
 /**
  * API 費用の概算。Vertex AI Gemini 2.5 Flash の従量課金、Cloud Run の
- * 最小インスタンス費、Supabase Pro 固定費の合計をざっくり出す。
+ * 最小インスタンス費、Supabase Pro 固定費の合計を出す。
  *
- * 用途は「月次費用がいつもより跳ねていないか」を見るトレンド指標。
- * 厳密な実費は GCP Billing で確認すること。
- *
- * 注意:
- * - Gemini 費用は transcriptCount × avgDurationSec で動的算出（音声トークン課金）
- * - Cloud Run / Supabase は月額固定費なので期間フィルタの影響を受けない
+ * 実 token (transcripts.tokens_in/tokens_out) があれば実費計算、
+ * なければ avgDurationSec から推定する。
  */
 
 // Gemini 2.5 Flash の単価 (2026-05 時点)
-// 音声入力は token 化レートが 32 tokens/秒
 const GEMINI_AUDIO_TOKENS_PER_SEC = 32;
-const GEMINI_AUDIO_INPUT_USD_PER_1M = 0.3; // 音声入力
-const GEMINI_TEXT_INPUT_USD_PER_1M = 0.075; // プロンプト/システム
-const GEMINI_OUTPUT_USD_PER_1M = 0.3; // 書き起こし + 要約
-// 通話 1 件あたりプロンプトオーバーヘッド（システム指示等）
-const PROMPT_TOKENS_PER_CALL = 1500;
-// 出力 token 推定: 日本語の書き起こし ≒ 5 tokens/秒
-const OUTPUT_TOKENS_PER_SEC = 5;
-// 平均通話時間が取れない場合の fallback (秒)
+const GEMINI_INPUT_USD_PER_1M = 0.3; // 音声入力 (実際の tokens_in は audio token を含む合算値)
+const GEMINI_OUTPUT_USD_PER_1M = 0.3;
+const FALLBACK_PROMPT_TOKENS_PER_CALL = 1500;
+const FALLBACK_OUTPUT_TOKENS_PER_SEC = 5;
 const FALLBACK_AVG_DURATION_SEC = 180;
 
-// Cloud Run (voice-finalize) の固定費 (min-instances=1, 1CPU, 1Gi)
 const CLOUD_RUN_FIXED_USD_PER_MONTH = 8;
-// 1 通話 finalize あたりの可変費 (cpu-seconds)
 const CLOUD_RUN_VARIABLE_USD_PER_CALL = 0.002;
 
-// Supabase Pro 固定費（既に契約済み前提）
 const SUPABASE_FIXED_USD_PER_MONTH = 25;
 
-// 円換算レート（おおまかな目安）。為替変動の影響を切り分けるため定数化。
 const USD_TO_JPY = 155;
 
 export interface ApiCostEstimate {
+  /** "actual" = transcripts の tokens_in/out 集計、"estimate" = 推定 */
+  source: "actual" | "estimate";
   transcriptCount: number;
-  avgDurationSec: number;
+  tokensIn: number;
+  tokensOut: number;
   geminiUsd: number;
-  geminiAudioUsd: number;
-  geminiTextUsd: number;
+  geminiInputUsd: number;
   geminiOutputUsd: number;
   cloudRunUsd: number;
   supabaseUsd: number;
@@ -49,22 +38,30 @@ export interface ApiCostEstimate {
 
 export function estimateApiCost(
   transcriptCount: number,
-  avgDurationSec: number | null
+  avgDurationSec: number | null,
+  totalTokensIn: number,
+  totalTokensOut: number
 ): ApiCostEstimate {
-  const avgDur = avgDurationSec ?? FALLBACK_AVG_DURATION_SEC;
-  const audioTokensPerCall = avgDur * GEMINI_AUDIO_TOKENS_PER_SEC;
-  const outputTokensPerCall = avgDur * OUTPUT_TOKENS_PER_SEC;
+  // 実 token があれば優先 (transcripts.tokens_in/out > 0)
+  const hasActual = totalTokensIn > 0 || totalTokensOut > 0;
 
-  const geminiAudioUsd =
-    (transcriptCount * audioTokensPerCall * GEMINI_AUDIO_INPUT_USD_PER_1M) /
-    1_000_000;
-  const geminiTextUsd =
-    (transcriptCount * PROMPT_TOKENS_PER_CALL * GEMINI_TEXT_INPUT_USD_PER_1M) /
-    1_000_000;
-  const geminiOutputUsd =
-    (transcriptCount * outputTokensPerCall * GEMINI_OUTPUT_USD_PER_1M) /
-    1_000_000;
-  const geminiUsd = geminiAudioUsd + geminiTextUsd + geminiOutputUsd;
+  let tokensIn: number;
+  let tokensOut: number;
+  if (hasActual) {
+    tokensIn = totalTokensIn;
+    tokensOut = totalTokensOut;
+  } else {
+    const avgDur = avgDurationSec ?? FALLBACK_AVG_DURATION_SEC;
+    tokensIn =
+      transcriptCount *
+      (avgDur * GEMINI_AUDIO_TOKENS_PER_SEC + FALLBACK_PROMPT_TOKENS_PER_CALL);
+    tokensOut =
+      transcriptCount * Math.round(avgDur * FALLBACK_OUTPUT_TOKENS_PER_SEC);
+  }
+
+  const geminiInputUsd = (tokensIn * GEMINI_INPUT_USD_PER_1M) / 1_000_000;
+  const geminiOutputUsd = (tokensOut * GEMINI_OUTPUT_USD_PER_1M) / 1_000_000;
+  const geminiUsd = geminiInputUsd + geminiOutputUsd;
 
   const cloudRunUsd =
     CLOUD_RUN_FIXED_USD_PER_MONTH +
@@ -73,11 +70,12 @@ export function estimateApiCost(
   const totalUsd = geminiUsd + cloudRunUsd + supabaseUsd;
 
   return {
+    source: hasActual ? "actual" : "estimate",
     transcriptCount,
-    avgDurationSec: avgDur,
+    tokensIn,
+    tokensOut,
     geminiUsd: round3(geminiUsd),
-    geminiAudioUsd: round3(geminiAudioUsd),
-    geminiTextUsd: round3(geminiTextUsd),
+    geminiInputUsd: round3(geminiInputUsd),
     geminiOutputUsd: round3(geminiOutputUsd),
     cloudRunUsd: round2(cloudRunUsd),
     supabaseUsd: round2(supabaseUsd),
