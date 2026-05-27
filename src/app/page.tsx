@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireAdmin } from "@/lib/supabase/auth";
+import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { fetchDashboardData, formatDurationSec } from "@/lib/dashboard/queries";
 import { estimateApiCost } from "@/lib/dashboard/api-cost";
@@ -46,7 +46,7 @@ export default async function DashboardPage({
 }: {
   searchParams: PageSearchParams;
 }) {
-  await requireAdmin();
+  await requireUser();
   const supabase = createClient();
 
   const preset = parsePreset(searchParams.period);

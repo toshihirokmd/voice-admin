@@ -36,12 +36,10 @@ export default async function RootLayout({
             <nav className="flex items-center gap-4 text-sm">
               {user && (
                 <>
-                  {user.role === "admin" && (
-                    <Link href="/" className={navLinkCls}>
-                      <IconDashboard className="text-blue-500" />
-                      ダッシュボード
-                    </Link>
-                  )}
+                  <Link href="/" className={navLinkCls}>
+                    <IconDashboard className="text-blue-500" />
+                    ダッシュボード
+                  </Link>
                   <Link href="/me" className={navLinkCls}>
                     <IconMe className="text-emerald-500" />
                     マイページ
