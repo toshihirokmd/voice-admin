@@ -19,12 +19,13 @@ export default async function RootLayout({
       <body className="bg-gray-50 text-gray-900 min-h-screen">
         <header className="bg-white border-b">
           <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-            <Link href="/recordings" className="text-lg font-semibold">
+            <Link href="/" className="text-lg font-semibold">
               Voice Admin
             </Link>
             <nav className="flex items-center gap-4 text-sm">
               {user?.role === "admin" && (
                 <>
+                  <Link href="/" className="hover:underline">ダッシュボード</Link>
                   <Link href="/recordings" className="hover:underline">録音一覧</Link>
                   <Link href="/prompt" className="hover:underline">プロンプト</Link>
                   <Link href="/products" className="hover:underline">商品</Link>
