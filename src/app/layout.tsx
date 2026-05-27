@@ -10,6 +10,7 @@ import {
   IconProduct,
   IconUsers,
 } from "./_components/NavIcons";
+import { SignOutButton } from "./_components/SignOutButton";
 
 export const metadata: Metadata = {
   title: "Voice Admin",
@@ -70,6 +71,7 @@ export default async function RootLayout({
                       （{user.role ?? "未設定"}）
                     </span>
                   </span>
+                  <SignOutButton />
                 </>
               )}
             </nav>
