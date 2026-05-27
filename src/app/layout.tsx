@@ -2,11 +2,22 @@ import "./globals.css";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/auth";
+import {
+  IconDashboard,
+  IconMe,
+  IconMic,
+  IconPrompt,
+  IconProduct,
+  IconUsers,
+} from "./_components/NavIcons";
 
 export const metadata: Metadata = {
   title: "Voice Admin",
   description: "音声書き起こしの管理コンソール",
 };
+
+const navLinkCls =
+  "inline-flex items-center gap-1.5 text-gray-700 hover:text-blue-700 hover:underline transition";
 
 export default async function RootLayout({
   children,
@@ -23,23 +34,45 @@ export default async function RootLayout({
               Voice Admin
             </Link>
             <nav className="flex items-center gap-4 text-sm">
-              {user?.role === "admin" && (
-                <>
-                  <Link href="/" className="hover:underline">ダッシュボード</Link>
-                  <Link href="/recordings" className="hover:underline">録音一覧</Link>
-                  <Link href="/prompt" className="hover:underline">プロンプト</Link>
-                  <Link href="/products" className="hover:underline">商品</Link>
-                  <Link href="/users" className="hover:underline">ユーザー</Link>
-                </>
-              )}
               {user && (
-                <Link
-                  href="/me"
-                  className="text-gray-600 hover:text-gray-900 hover:underline transition"
-                  title="マイページ"
-                >
-                  {user.displayName ?? user.email}（{user.role ?? "未設定"}）
-                </Link>
+                <>
+                  {user.role === "admin" && (
+                    <Link href="/" className={navLinkCls}>
+                      <IconDashboard className="text-blue-500" />
+                      ダッシュボード
+                    </Link>
+                  )}
+                  <Link href="/me" className={navLinkCls}>
+                    <IconMe className="text-emerald-500" />
+                    マイページ
+                  </Link>
+                  {user.role === "admin" && (
+                    <>
+                      <Link href="/recordings" className={navLinkCls}>
+                        <IconMic className="text-violet-500" />
+                        録音一覧
+                      </Link>
+                      <Link href="/prompt" className={navLinkCls}>
+                        <IconPrompt className="text-amber-500" />
+                        プロンプト
+                      </Link>
+                      <Link href="/products" className={navLinkCls}>
+                        <IconProduct className="text-rose-500" />
+                        商品
+                      </Link>
+                      <Link href="/users" className={navLinkCls}>
+                        <IconUsers className="text-slate-500" />
+                        ユーザー
+                      </Link>
+                    </>
+                  )}
+                  <span className="text-gray-500 pl-3 ml-1 border-l border-gray-200">
+                    {user.displayName ?? user.email}
+                    <span className="text-gray-400 text-xs ml-1">
+                      （{user.role ?? "未設定"}）
+                    </span>
+                  </span>
+                </>
               )}
             </nav>
           </div>
