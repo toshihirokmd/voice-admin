@@ -1,77 +1,175 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { jstMonthStartIso, jstTodayStartIso } from "./date";
+import { isoToJstYmd, type PeriodRange } from "./date";
+
+export interface DashboardFilter {
+  range: PeriodRange;
+  /** operator_email で絞り込む。未指定なら全員 */
+  operator?: string;
+}
 
 export interface DashboardData {
+  rangeLabel: string;
+  rangeStartYmd: string;
+  rangeEndYmd: string;
   todayCallCount: number;
-  monthCallCount: number;
-  avgDurationSecMonth: number | null;
-  topProductsMonth: { name: string; count: number }[];
-  topOperatorsMonth: { email: string; displayName: string; count: number }[];
-  proposalSuccessMonth: { key: string; success: number; proposed: number }[];
-  transcriptCountMonth: number;
+  rangeCallCount: number;
+  avgDurationSec: number | null;
+  topProducts: { name: string; count: number }[];
+  topOperators: { email: string; displayName: string; count: number }[];
+  proposalSuccess: { key: string; success: number; proposed: number }[];
+  transcriptCount: number;
   displayNamesByEmail: Map<string, string | null>;
-  /** 今月の日別受電数 (date は YYYY-MM-DD・JST、month の 1 日から今日まで全日埋め) */
-  dailyCallsMonth: { date: string; count: number }[];
+  /** 日別受電数 (date は YYYY-MM-DD・JST、range の全日埋め) */
+  dailyCalls: { date: string; count: number }[];
+  /** 利用可能な operator 一覧（FilterBar の select 用） */
+  allOperators: { email: string; displayName: string }[];
 }
 
 /**
  * ダッシュボード用データを一括取得する。SSR 内で 1 回呼ぶ前提。
- * 各テーブルを並列に query し、JS 側で集計する。
+ * filter で期間と operator を指定。operator 指定時は対象期間の recordings
+ * から session_id を集めて transcripts/proposals を IN で絞る。
  */
 export async function fetchDashboardData(
-  supabase: SupabaseClient
+  supabase: SupabaseClient,
+  filter: DashboardFilter
 ): Promise<DashboardData> {
-  const todayStart = jstTodayStartIso();
-  const monthStart = jstMonthStartIso();
+  const { range, operator } = filter;
+  const startIso = range.startIso;
+  const endIso = range.endExclusiveIso;
+
+  // 今日の数だけは「期間にかかわらず今日」をその場で算出
+  const todayStartIso = (() => {
+    const today = isoToJstYmd(new Date().toISOString());
+    return new Date(`${today}T00:00:00+09:00`).toISOString();
+  })();
+
+  // operator 指定時のセッションID取得（transcripts/proposals 絞り込み用）
+  let sessionIds: string[] | null = null;
+  if (operator) {
+    const sidRes = await supabase
+      .from("recordings")
+      .select("session_id")
+      .eq("operator_email", operator)
+      .gte("started_at", startIso)
+      .lt("started_at", endIso);
+    sessionIds = ((sidRes.data ?? []) as { session_id: string }[]).map(
+      (r) => r.session_id
+    );
+  }
+
+  // 期間内 件数
+  const rangeCountBuilder = (() => {
+    let q = supabase
+      .from("recordings")
+      .select("*", { count: "exact", head: true })
+      .gte("started_at", startIso)
+      .lt("started_at", endIso);
+    if (operator) q = q.eq("operator_email", operator);
+    return q;
+  })();
+
+  // 期間内 通話時間
+  const rangeDurationsBuilder = (() => {
+    let q = supabase
+      .from("recordings")
+      .select("duration_sec")
+      .not("duration_sec", "is", null)
+      .gte("started_at", startIso)
+      .lt("started_at", endIso);
+    if (operator) q = q.eq("operator_email", operator);
+    return q;
+  })();
+
+  // 期間内 recordings (operator + 日別集計用)
+  const rangeRecordingsBuilder = (() => {
+    let q = supabase
+      .from("recordings")
+      .select("operator_email,started_at")
+      .gte("started_at", startIso)
+      .lt("started_at", endIso);
+    if (operator) q = q.eq("operator_email", operator);
+    return q;
+  })();
+
+  // transcripts (期間 + 必要なら session_id IN)
+  const transcriptsBuilder = (() => {
+    let q = supabase
+      .from("transcripts")
+      .select("products, session_id, created_at")
+      .gte("created_at", startIso)
+      .lt("created_at", endIso);
+    if (sessionIds !== null) {
+      q = q.in("session_id", sessionIds.length === 0 ? ["__none__"] : sessionIds);
+    }
+    return q;
+  })();
+
+  // proposals (期間 + 必要なら session_id IN)
+  const proposalsBuilder = (() => {
+    let q = supabase
+      .from("proposals")
+      .select("items, session_id, proposed_at")
+      .gte("proposed_at", startIso)
+      .lt("proposed_at", endIso);
+    if (sessionIds !== null) {
+      q = q.in("session_id", sessionIds.length === 0 ? ["__none__"] : sessionIds);
+    }
+    return q;
+  })();
 
   // 並列 fetch
   const [
     todayCountRes,
-    monthCountRes,
-    monthDurationsRes,
-    monthOperatorsRes,
-    monthTranscriptsRes,
-    monthProposalsRes,
+    rangeCountRes,
+    rangeDurationsRes,
+    rangeRecordingsRes,
+    rangeTranscriptsRes,
+    rangeProposalsRes,
     displayNamesRes,
+    allOperatorsRes,
   ] = await Promise.all([
+    // 今日 (operator フィルタは適用しない＝KPI として全員)
     supabase
       .from("recordings")
       .select("*", { count: "exact", head: true })
-      .gte("started_at", todayStart),
-    supabase
-      .from("recordings")
-      .select("*", { count: "exact", head: true })
-      .gte("started_at", monthStart),
-    supabase
-      .from("recordings")
-      .select("duration_sec")
-      .gte("started_at", monthStart)
-      .not("duration_sec", "is", null),
-    supabase
-      .from("recordings")
-      .select("operator_email,started_at")
-      .gte("started_at", monthStart),
-    supabase
-      .from("transcripts")
-      .select("products, created_at")
-      .gte("created_at", monthStart),
-    supabase
-      .from("proposals")
-      .select("items, proposed_at")
-      .gte("proposed_at", monthStart),
+      .gte("started_at", todayStartIso),
+    rangeCountBuilder,
+    rangeDurationsBuilder,
+    rangeRecordingsBuilder,
+    transcriptsBuilder,
+    proposalsBuilder,
     supabase.from("user_roles").select("email,display_name"),
+    // operator select 候補（過去 90 日に発信のあった operator）
+    supabase
+      .from("recordings")
+      .select("operator_email")
+      .not("operator_email", "is", null)
+      .gte(
+        "started_at",
+        new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
+      ),
   ]);
 
   // 平均通話時間
-  const durations = (monthDurationsRes.data ?? []) as { duration_sec: number }[];
-  const avgDurationSecMonth =
+  const durations = (rangeDurationsRes.data ?? []) as { duration_sec: number }[];
+  const avgDurationSec =
     durations.length > 0
       ? Math.round(
           durations.reduce((s, r) => s + r.duration_sec, 0) / durations.length
         )
       : null;
 
-  // オペレーター集計 (今月) + 日別受電数集計 (同じデータから)
+  // 表示名
+  const displayNamesByEmail = new Map<string, string | null>();
+  for (const u of (displayNamesRes.data ?? []) as {
+    email: string;
+    display_name: string | null;
+  }[]) {
+    displayNamesByEmail.set(u.email, u.display_name);
+  }
+
+  // 期間内 recordings から: オペレーター集計 + 日別集計
   const operatorCounts = new Map<string, number>();
   const dailyCountMap = new Map<string, number>();
   const tokyoFmt = new Intl.DateTimeFormat("en-CA", {
@@ -80,7 +178,7 @@ export async function fetchDashboardData(
     month: "2-digit",
     day: "2-digit",
   });
-  for (const r of (monthOperatorsRes.data ?? []) as {
+  for (const r of (rangeRecordingsRes.data ?? []) as {
     operator_email: string | null;
     started_at: string;
   }[]) {
@@ -92,26 +190,20 @@ export async function fetchDashboardData(
     }
   }
 
-  // 月初〜今日まで全日埋め (受電 0 件の日も 0 で出す)
-  const monthStartDate = new Date(monthStart);
-  const todayJst = new Date(todayStart);
-  const dailyCallsMonth: { date: string; count: number }[] = [];
+  // 日別データ: 期間内の全日を埋める
+  const dailyCalls: { date: string; count: number }[] = [];
+  const startDt = new Date(range.startIso);
+  const endDt = new Date(range.endExclusiveIso);
   for (
-    let d = new Date(monthStartDate);
-    d <= todayJst;
+    let d = new Date(startDt);
+    d < endDt;
     d.setUTCDate(d.getUTCDate() + 1)
   ) {
     const ymd = tokyoFmt.format(d);
-    dailyCallsMonth.push({ date: ymd, count: dailyCountMap.get(ymd) ?? 0 });
+    dailyCalls.push({ date: ymd, count: dailyCountMap.get(ymd) ?? 0 });
   }
-  const displayNamesByEmail = new Map<string, string | null>();
-  for (const u of (displayNamesRes.data ?? []) as {
-    email: string;
-    display_name: string | null;
-  }[]) {
-    displayNamesByEmail.set(u.email, u.display_name);
-  }
-  const topOperatorsMonth = [...operatorCounts.entries()]
+
+  const topOperators = [...operatorCounts.entries()]
     .map(([email, count]) => ({
       email,
       displayName: displayNamesByEmail.get(email) ?? email.split("@")[0],
@@ -120,9 +212,9 @@ export async function fetchDashboardData(
     .sort((a, b) => b.count - a.count)
     .slice(0, 5);
 
-  // 商材集計 (今月)
+  // 商材集計
   const productCounts = new Map<string, number>();
-  for (const t of (monthTranscriptsRes.data ?? []) as {
+  for (const t of (rangeTranscriptsRes.data ?? []) as {
     products: string[] | null;
   }[]) {
     for (const p of t.products ?? []) {
@@ -130,15 +222,15 @@ export async function fetchDashboardData(
       productCounts.set(p, (productCounts.get(p) ?? 0) + 1);
     }
   }
-  const topProductsMonth = [...productCounts.entries()]
+  const topProducts = [...productCounts.entries()]
     .map(([name, count]) => ({ name, count }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 10);
 
-  // 提案成功集計 (今月) — items は { key: "1"|"0"|null } の JSONB
+  // 提案成功集計
   const success = new Map<string, number>();
   const proposed = new Map<string, number>();
-  for (const row of (monthProposalsRes.data ?? []) as {
+  for (const row of (rangeProposalsRes.data ?? []) as {
     items: Record<string, string | null> | null;
   }[]) {
     if (!row.items) continue;
@@ -149,7 +241,7 @@ export async function fetchDashboardData(
       }
     }
   }
-  const proposalSuccessMonth = [
+  const proposalSuccess = [
     ...new Set([...success.keys(), ...proposed.keys()]),
   ]
     .map((key) => ({
@@ -160,16 +252,34 @@ export async function fetchDashboardData(
     .sort((a, b) => b.success - a.success)
     .filter((row) => row.proposed > 0);
 
+  // 過去 90 日に発信のあった operator 一覧 (FilterBar 用)
+  const allOpEmails = new Set<string>();
+  for (const r of (allOperatorsRes.data ?? []) as {
+    operator_email: string | null;
+  }[]) {
+    if (r.operator_email) allOpEmails.add(r.operator_email);
+  }
+  const allOperators = [...allOpEmails]
+    .map((email) => ({
+      email,
+      displayName: displayNamesByEmail.get(email) ?? email.split("@")[0],
+    }))
+    .sort((a, b) => a.displayName.localeCompare(b.displayName, "ja"));
+
   return {
+    rangeLabel: range.label,
+    rangeStartYmd: range.startYmd,
+    rangeEndYmd: range.endYmd,
     todayCallCount: todayCountRes.count ?? 0,
-    monthCallCount: monthCountRes.count ?? 0,
-    avgDurationSecMonth,
-    topProductsMonth,
-    topOperatorsMonth,
-    proposalSuccessMonth,
-    transcriptCountMonth: (monthTranscriptsRes.data ?? []).length,
+    rangeCallCount: rangeCountRes.count ?? 0,
+    avgDurationSec,
+    topProducts,
+    topOperators,
+    proposalSuccess,
+    transcriptCount: (rangeTranscriptsRes.data ?? []).length,
     displayNamesByEmail,
-    dailyCallsMonth,
+    dailyCalls,
+    allOperators,
   };
 }
 

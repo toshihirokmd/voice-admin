@@ -6,9 +6,10 @@ import Link from "next/link";
 
 interface Props {
   data: { date: string; count: number }[];
+  operatorParam?: string | null;
 }
 
-export function DailyCallChart({ data }: Props) {
+export function DailyCallChart({ data, operatorParam }: Props) {
   if (data.length === 0) {
     return <p className="text-sm text-gray-400">データなし</p>;
   }
@@ -78,7 +79,13 @@ export function DailyCallChart({ data }: Props) {
             i === data.length - 1 || i === 0 || i % labelEveryN === 0;
           return (
             <g key={d.date}>
-              <Link href={`/recordings?start_date=${d.date}&end_date=${d.date}`}>
+              <Link
+                href={`/recordings?${new URLSearchParams({
+                  start_date: d.date,
+                  end_date: d.date,
+                  ...(operatorParam ? { operator: operatorParam } : {}),
+                }).toString()}`}
+              >
                 <rect
                   x={x}
                   y={y}
