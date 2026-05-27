@@ -61,7 +61,7 @@ export default async function DashboardPage({
     range,
     operator: operator || undefined,
   });
-  const cost = estimateApiCost(data.transcriptCount);
+  const cost = estimateApiCost(data.transcriptCount, data.avgDurationSec);
   const todayYmd = jstTodayYmd();
 
   // recordings へのリンクで使う共通クエリ
@@ -145,7 +145,10 @@ export default async function DashboardPage({
           <div className="text-xs text-amber-600/70 mt-1">m:ss</div>
         </div>
 
-        <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 rounded-xl p-4">
+        <div
+          className="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 rounded-xl p-4"
+          title={`Gemini: $${cost.geminiUsd} (音声$${cost.geminiAudioUsd} + プロンプト$${cost.geminiTextUsd} + 出力$${cost.geminiOutputUsd})\nCloud Run: $${cost.cloudRunUsd} (月額固定$8 + 通話あたり$0.002)\nSupabase: $${cost.supabaseUsd} (月額固定)`}
+        >
           <div className="flex items-center justify-between">
             <div className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">
               概算 API 費用
@@ -155,9 +158,15 @@ export default async function DashboardPage({
           <div className="text-3xl font-bold text-emerald-900 mt-2 tabular-nums">
             ¥{cost.totalJpy.toLocaleString()}
           </div>
-          <div className="text-[10px] text-emerald-700/70 mt-1 leading-tight">
-            ${cost.totalUsd}（Gemini ${cost.geminiUsd} / Run ${cost.cloudRunUsd}{" "}
-            / Supabase ${cost.supabaseUsd}）
+          <div className="text-[10px] text-emerald-700/70 mt-1 leading-tight space-y-0.5">
+            <div>
+              Gemini ${cost.geminiUsd}（{data.transcriptCount}件 × 平均
+              {Math.round(cost.avgDurationSec)}秒）
+            </div>
+            <div>
+              Run ${cost.cloudRunUsd} / Supabase ${cost.supabaseUsd}
+              <span className="text-emerald-600/60">（月額固定）</span>
+            </div>
           </div>
         </div>
       </div>
