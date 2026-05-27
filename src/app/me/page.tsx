@@ -9,10 +9,15 @@ import {
   proposalSuccessMap,
   calcOverallProposalRate,
 } from "@/lib/me/queries";
-import { resolvePeriodRange } from "@/lib/dashboard/date";
+import { jstTodayYmd, resolvePeriodRange } from "@/lib/dashboard/date";
 import { PROPOSAL_ITEMS } from "@/lib/proposal/items";
 import { DailyCallChart } from "../_components/DailyCallChart";
 import { DisplayNameForm } from "./_components/DisplayNameForm";
+import {
+  DailyReportView,
+  type DailyReport,
+} from "./_components/DailyReportView";
+import { GenerateReportButton } from "./_components/GenerateReportButton";
 
 export const dynamic = "force-dynamic";
 
@@ -25,11 +30,18 @@ export default async function MyPage() {
   const supabase = createClient();
 
   const range = resolvePeriodRange("this_month");
-  const { me, prev, global, prevRange } = await fetchMeData(
-    supabase,
-    user.email,
-    range
-  );
+  const todayYmd = jstTodayYmd();
+  const [meDataResult, todayReportRow] = await Promise.all([
+    fetchMeData(supabase, user.email, range),
+    supabase
+      .from("daily_reports")
+      .select("highlights, overall_comment, generated_at, tokens_in, tokens_out, model")
+      .eq("operator_email", user.email)
+      .eq("report_date", todayYmd)
+      .maybeSingle(),
+  ]);
+  const { me, prev, global, prevRange } = meDataResult;
+  const todayReport = (todayReportRow.data as DailyReport | null) ?? null;
 
   // 個人の提案成功率（加重平均）
   const meRate = calcOverallProposalRate(proposalSuccessMap(me));
@@ -169,6 +181,24 @@ export default async function MyPage() {
           />
         </div>
       </section>
+
+      {/* 今日のレポート */}
+      {todayReport ? (
+        <DailyReportView report={todayReport} />
+      ) : (
+        <section className="bg-white border rounded-lg p-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-semibold">今日のレポート</h2>
+            <p className="text-xs text-gray-500 mt-1">
+              本日（{todayYmd}）の通話を AI に分析させて、注目したい4カテゴリの会話を抽出します。
+            </p>
+            <p className="text-[10px] text-gray-400 mt-1">
+              生成コスト: 1回あたり 約 ¥0.2（任意なので押した時だけ）
+            </p>
+          </div>
+          <GenerateReportButton />
+        </section>
+      )}
 
       {/* 日別チャート */}
       <section className="bg-white border rounded-lg p-4">
