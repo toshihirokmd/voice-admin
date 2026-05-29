@@ -26,6 +26,8 @@ export interface DashboardData {
   dailyCalls: { date: string; count: number }[];
   /** 利用可能な operator 一覧（FilterBar の select 用） */
   allOperators: { email: string; displayName: string }[];
+  /** 通話種別 (call_type) の内訳。count 降順 */
+  callTypeBreakdown: { type: string; count: number }[];
 }
 
 /**
@@ -82,11 +84,11 @@ export async function fetchDashboardData(
     return q;
   })();
 
-  // 期間内 recordings (オペレーター集計 + 日別集計用)
+  // 期間内 recordings (オペレーター集計 + 日別集計 + 種別集計用)
   const rangeRecordingsBuilder = (() => {
     let q = supabase
       .from("recordings")
-      .select("operator_email,started_at")
+      .select("operator_email,started_at,call_type")
       .gte("started_at", startIso)
       .lt("started_at", endIso);
     if (operator) q = q.eq("operator_email", operator);
@@ -179,9 +181,11 @@ export async function fetchDashboardData(
     month: "2-digit",
     day: "2-digit",
   });
+  const callTypeCounts = new Map<string, number>();
   for (const r of (rangeRecordingsRes.data ?? []) as {
     operator_email: string | null;
     started_at: string;
+    call_type: string | null;
   }[]) {
     const email = r.operator_email ?? "(unknown)";
     operatorCounts.set(email, (operatorCounts.get(email) ?? 0) + 1);
@@ -189,7 +193,13 @@ export async function fetchDashboardData(
       const ymd = tokyoFmt.format(new Date(r.started_at));
       dailyCountMap.set(ymd, (dailyCountMap.get(ymd) ?? 0) + 1);
     }
+    if (r.call_type) {
+      callTypeCounts.set(r.call_type, (callTypeCounts.get(r.call_type) ?? 0) + 1);
+    }
   }
+  const callTypeBreakdown = [...callTypeCounts.entries()]
+    .map(([type, count]) => ({ type, count }))
+    .sort((a, b) => b.count - a.count);
 
   // 日別データ: 期間内の全日を埋める
   const dailyCalls: { date: string; count: number }[] = [];
@@ -284,6 +294,7 @@ export async function fetchDashboardData(
     displayNamesByEmail,
     dailyCalls,
     allOperators,
+    callTypeBreakdown,
   };
 }
 

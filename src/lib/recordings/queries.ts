@@ -46,6 +46,7 @@ export type Recording = {
   duration_sec: number | null;
   operator_email: string | null;
   status: string;
+  call_type: string | null;
   transcripts: RecordingTranscript[];
 };
 
@@ -142,7 +143,7 @@ export async function fetchFilteredRecordings(
   let query = supabase
     .from("recordings")
     .select(
-      "id,session_id,started_at,ended_at,duration_sec,operator_email,status,transcripts(title,summary,merged_text,products)",
+      "id,session_id,started_at,ended_at,duration_sec,operator_email,status,call_type,transcripts(title,summary,merged_text,products)",
       { count: "exact" }
     )
     .order("started_at", { ascending: false })

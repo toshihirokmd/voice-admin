@@ -9,6 +9,7 @@ import {
   type PeriodPreset,
 } from "@/lib/dashboard/date";
 import { PROPOSAL_ITEMS } from "@/lib/proposal/items";
+import { callTypeLabel, callTypeBadgeClass } from "@/lib/call-type";
 import { DailyCallChart } from "./_components/DailyCallChart";
 import { FilterBar } from "./_components/FilterBar";
 
@@ -190,6 +191,49 @@ export default async function DashboardPage({
           operatorParam={operator || null}
         />
       </section>
+
+      {/* Call type breakdown */}
+      {data.callTypeBreakdown.length > 0 && (
+        <section className="bg-white border rounded-lg p-4">
+          <h2 className="font-semibold mb-3">通話種別の内訳</h2>
+          {(() => {
+            const total = data.callTypeBreakdown.reduce(
+              (s, c) => s + c.count,
+              0
+            );
+            return (
+              <div className="space-y-2">
+                {data.callTypeBreakdown.map((c) => {
+                  const pct = total > 0 ? (c.count / total) * 100 : 0;
+                  return (
+                    <div key={c.type}>
+                      <div className="flex items-center justify-between text-sm mb-1">
+                        <span
+                          className={`text-xs px-1.5 py-0.5 rounded ${callTypeBadgeClass(c.type)}`}
+                        >
+                          {callTypeLabel(c.type)}
+                        </span>
+                        <span className="font-mono text-gray-700">
+                          {c.count} 件
+                          <span className="text-gray-400 text-xs ml-1">
+                            ({pct.toFixed(0)}%)
+                          </span>
+                        </span>
+                      </div>
+                      <div className="h-2 bg-gray-100 rounded overflow-hidden">
+                        <div
+                          className="h-full bg-indigo-400 rounded"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+        </section>
+      )}
 
       {/* Rankings */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

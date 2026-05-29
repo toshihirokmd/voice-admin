@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireAdmin } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { PROPOSAL_ITEMS } from "@/lib/proposal/items";
+import { callTypeLabel, callTypeBadgeClass } from "@/lib/call-type";
 import { fetchProducts } from "@/lib/products/queries";
 import {
   buildSearchParams,
@@ -102,6 +103,7 @@ export default async function RecordingsPage({
             <col className="w-[64px]" />{/* 時間 */}
             <col className="w-[100px]" />{/* セッションID */}
             <col className="w-[110px]" />{/* 対応者 */}
+            <col className="w-[90px]" />{/* 種別 */}
             <col className="w-[240px]" />{/* タイトル */}
             {SHOW_PRODUCTS_COLUMN && <col className="w-[180px]" />/* 商品 */}
             <col className="w-[180px]" />{/* 商品グループ */}
@@ -117,6 +119,7 @@ export default async function RecordingsPage({
               <th className="px-3 py-2">時間</th>
               <th className="px-3 py-2">セッションID</th>
               <th className="px-3 py-2">対応者</th>
+              <th className="px-3 py-2">種別</th>
               <th className="px-3 py-2">タイトル</th>
               {SHOW_PRODUCTS_COLUMN && <th className="px-3 py-2">商品</th>}
               <th className="px-3 py-2">商品グループ</th>
@@ -140,6 +143,17 @@ export default async function RecordingsPage({
                   <td className="px-3 py-2 font-mono text-xs truncate">{r.session_id.slice(0, 8)}…</td>
                   <td className="px-3 py-2 truncate" title={r.operator_email ?? ""}>
                     {operatorDisplayName(r.operator_email, displayNamesByEmail)}
+                  </td>
+                  <td className="px-3 py-2 whitespace-nowrap">
+                    {r.call_type ? (
+                      <span
+                        className={`text-xs px-1.5 py-0.5 rounded ${callTypeBadgeClass(r.call_type)}`}
+                      >
+                        {callTypeLabel(r.call_type)}
+                      </span>
+                    ) : (
+                      <span className="text-gray-300 text-xs">—</span>
+                    )}
                   </td>
                   <td className="px-3 py-2 truncate" title={titleText}>
                     {titleText}
