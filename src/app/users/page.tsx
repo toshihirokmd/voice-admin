@@ -57,28 +57,40 @@ export default async function UsersPage() {
     .order("created_at", { ascending: false });
 
   if (error) {
-    return <p className="text-red-600">エラー: {error.message}</p>;
+    return <p className="text-brand-sakura">エラー: {error.message}</p>;
   }
   const users = (data ?? []) as UserRole[];
 
   return (
-    <section className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold">ユーザー管理</h1>
-        <p className="text-sm text-gray-600 mt-1">
+    <section className="space-y-6">
+      <header>
+        <div className="text-xs font-bold text-brand-leaf tracking-widest">
+          USERS
+        </div>
+        <h1 className="text-3xl font-extrabold text-brand-green">
+          ユーザー管理
+        </h1>
+        <div className="mt-1 h-1 w-12 rounded-full bg-brand-sakura" />
+        <p className="text-sm text-brand-sub mt-2">
           表示名（録音一覧の「対応者」列）とロールを編集できます。新規ユーザーは初回ログイン時に自動でoperatorとして登録されます。
         </p>
-      </div>
+      </header>
 
-      <div className="bg-white rounded shadow overflow-hidden">
+      <div className="bg-white border border-brand-border rounded-card shadow-soft overflow-hidden">
+        <div className="flex items-center gap-2 px-5 pt-5 pb-3">
+          <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-brand-soft text-base">
+            👥
+          </span>
+          <h2 className="font-bold text-brand-green">登録ユーザー一覧</h2>
+        </div>
         <table className="w-full text-sm">
-          <thead className="bg-gray-100 text-left">
+          <thead className="bg-brand-soft text-left text-brand-sub">
             <tr>
-              <th className="px-3 py-2">メールアドレス</th>
-              <th className="px-3 py-2">表示名</th>
-              <th className="px-3 py-2">ロール</th>
-              <th className="px-3 py-2">登録日</th>
-              <th className="px-3 py-2">操作</th>
+              <th className="py-3.5 px-3">メールアドレス</th>
+              <th className="py-3.5 px-3">表示名</th>
+              <th className="py-3.5 px-3">ロール</th>
+              <th className="py-3.5 px-3">登録日</th>
+              <th className="py-3.5 px-3">操作</th>
             </tr>
           </thead>
           <tbody>
@@ -87,7 +99,7 @@ export default async function UsersPage() {
             ))}
             {users.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-3 py-8 text-center text-gray-500">
+                <td colSpan={5} className="py-8 px-3 text-center text-brand-sub">
                   ユーザーがまだ登録されていません
                 </td>
               </tr>

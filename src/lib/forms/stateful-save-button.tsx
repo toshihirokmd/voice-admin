@@ -11,17 +11,18 @@ export type ActionResult =
 type Variant = "primary" | "secondary" | "danger" | "success";
 
 const baseClasses: Record<Variant, string> = {
-  primary: "bg-blue-600 text-white hover:bg-blue-700",
-  secondary: "bg-gray-200 text-gray-700 hover:bg-gray-300",
-  danger: "bg-red-600 text-white hover:bg-red-700",
-  success: "bg-green-600 text-white hover:bg-green-700",
+  primary: "bg-brand-green text-white font-bold hover:bg-brand-dark",
+  secondary:
+    "bg-white border border-brand-border text-brand-sub hover:bg-brand-soft",
+  danger: "bg-brand-sakura text-white hover:opacity-90",
+  success: "bg-brand-leaf text-white hover:bg-brand-green",
 };
 
 const pendingClasses: Record<Variant, string> = {
-  primary: "bg-blue-400 text-white",
-  secondary: "bg-gray-300 text-gray-700",
-  danger: "bg-red-400 text-white",
-  success: "bg-green-400 text-white",
+  primary: "bg-brand-green text-white opacity-60",
+  secondary: "bg-brand-soft text-brand-sub",
+  danger: "bg-brand-sakura text-white opacity-60",
+  success: "bg-brand-leaf text-white opacity-60",
 };
 
 export type StatefulSaveButtonProps = {
@@ -85,7 +86,7 @@ export function StatefulSaveButton({
   }, [errorAt]);
 
   const sizeClass = size === "sm" ? "px-3 py-1 text-xs" : "px-4 py-2 text-sm";
-  const commonClass = `${sizeClass} rounded transition-colors duration-200 inline-flex items-center gap-2 ${className}`;
+  const commonClass = `${sizeClass} rounded-lg transition-colors duration-200 inline-flex items-center gap-2 ${className}`;
 
   if (pending) {
     return (
@@ -101,7 +102,7 @@ export function StatefulSaveButton({
 
   if (showSaved) {
     return (
-      <button type="submit" className={`${commonClass} bg-green-600 text-white`}>
+      <button type="submit" className={`${commonClass} bg-brand-leaf text-white font-bold`}>
         {savedLabel}
       </button>
     );
@@ -109,7 +110,7 @@ export function StatefulSaveButton({
 
   if (showError) {
     return (
-      <button type="submit" className={`${commonClass} bg-red-600 text-white`}>
+      <button type="submit" className={`${commonClass} bg-brand-sakura text-white font-bold`}>
         {errorLabel}
       </button>
     );

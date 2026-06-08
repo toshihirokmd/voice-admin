@@ -83,14 +83,20 @@ export default async function DashboardPage({
     : null;
 
   return (
-    <section className="space-y-5">
+    <section className="space-y-6">
       <header>
-        <h1 className="text-2xl font-bold">ダッシュボード</h1>
-        <p className="text-xs text-gray-500 mt-1">
+        <div className="text-xs font-bold text-brand-leaf tracking-widest">
+          DASHBOARD
+        </div>
+        <h1 className="text-3xl font-extrabold text-brand-green">
+          ダッシュボード
+        </h1>
+        <div className="mt-1 h-1 w-12 rounded-full bg-brand-sakura" />
+        <p className="text-xs text-brand-sub mt-2">
           {data.rangeLabel} ({data.rangeStartYmd}
           {data.rangeStartYmd !== data.rangeEndYmd && ` 〜 ${data.rangeEndYmd}`})
           {operatorDisplayName && ` / 担当: ${operatorDisplayName}`}
-          {" "}— 各セクションをクリックで該当の録音一覧に遷移
+          {" "}— 各カードをクリックで該当の録音一覧に遷移
         </p>
       </header>
 
@@ -102,69 +108,79 @@ export default async function DashboardPage({
         currentEndYmd={data.rangeEndYmd}
       />
 
-      {/* KPI cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      {/* KPI cards：主役の「今日の受電」だけ深緑ヒーロー、他は白＋アイコンチップ */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
         <Link
           href={`/recordings?start_date=${todayYmd}&end_date=${todayYmd}`}
-          className="group bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-4 hover:shadow-md hover:from-blue-100 hover:to-blue-200 transition"
+          className="group rounded-card p-5 shadow-softlg bg-gradient-to-br from-brand-green to-brand-dark text-white hover:-translate-y-0.5 transition"
         >
           <div className="flex items-center justify-between">
-            <div className="text-xs font-semibold text-blue-700 uppercase tracking-wider">
+            <div className="text-xs font-bold text-white/80 tracking-wider">
               今日の受電
             </div>
-            <div className="w-2 h-2 rounded-full bg-blue-400 group-hover:bg-blue-600 transition" />
+            <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-white/15 text-base">
+              📞
+            </span>
           </div>
-          <div className="text-4xl font-bold text-blue-900 mt-2 tabular-nums">
+          <div className="text-5xl font-extrabold mt-2 tabular-nums leading-none">
             {data.todayCallCount}
           </div>
-          <div className="text-xs text-blue-600/70 mt-1">({todayYmd})</div>
+          <div className="text-xs text-white/75 mt-2">
+            <span className="px-1.5 py-0.5 rounded-full bg-white/15 font-bold">
+              {todayYmd}
+            </span>
+          </div>
         </Link>
 
         <Link
           href={`/recordings?${recordingsBaseQs}`}
-          className="group bg-gradient-to-br from-violet-50 to-violet-100 border border-violet-200 rounded-xl p-4 hover:shadow-md hover:from-violet-100 hover:to-violet-200 transition"
+          className="group bg-white border border-brand-border rounded-card p-5 shadow-soft hover:shadow-softlg hover:-translate-y-0.5 transition"
         >
           <div className="flex items-center justify-between">
-            <div className="text-xs font-semibold text-violet-700 uppercase tracking-wider">
+            <div className="text-xs font-bold text-brand-sub tracking-wider">
               期間内 受電
             </div>
-            <div className="w-2 h-2 rounded-full bg-violet-400 group-hover:bg-violet-600 transition" />
+            <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-brand-soft text-brand-green text-base">
+              📈
+            </span>
           </div>
-          <div className="text-4xl font-bold text-violet-900 mt-2 tabular-nums">
+          <div className="text-4xl font-extrabold text-brand-green mt-2 tabular-nums leading-none">
             {data.rangeCallCount}
           </div>
-          <div className="text-xs text-violet-600/70 mt-1">
-            {data.rangeLabel}
-          </div>
+          <div className="text-xs text-brand-sub mt-2">{data.rangeLabel}</div>
         </Link>
 
-        <div className="bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-200 rounded-xl p-4">
+        <div className="bg-white border border-brand-border rounded-card p-5 shadow-soft">
           <div className="flex items-center justify-between">
-            <div className="text-xs font-semibold text-amber-700 uppercase tracking-wider">
+            <div className="text-xs font-bold text-brand-sub tracking-wider">
               平均通話時間
             </div>
-            <div className="w-2 h-2 rounded-full bg-amber-400" />
+            <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-brand-soft text-brand-green text-base">
+              ⏱️
+            </span>
           </div>
-          <div className="text-4xl font-bold text-amber-900 mt-2 tabular-nums">
+          <div className="text-4xl font-extrabold text-brand-green mt-2 tabular-nums leading-none">
             {formatDurationSec(data.avgDurationSec)}
           </div>
-          <div className="text-xs text-amber-600/70 mt-1">m:ss</div>
+          <div className="text-xs text-brand-sub mt-2">m:ss</div>
         </div>
 
         <div
-          className="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 rounded-xl p-4"
+          className="bg-white border border-brand-border rounded-card p-5 shadow-soft"
           title={`Gemini: $${cost.geminiUsd} (入力$${cost.geminiInputUsd} + 出力$${cost.geminiOutputUsd})\nCloud Run: $${cost.cloudRunUsd} (月額固定$8 + 通話あたり$0.002)\nSupabase: $${cost.supabaseUsd} (月額固定)\nTokens: in ${cost.tokensIn.toLocaleString()} / out ${cost.tokensOut.toLocaleString()}`}
         >
           <div className="flex items-center justify-between">
-            <div className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">
+            <div className="text-xs font-bold text-brand-sub tracking-wider">
               API 費用 {cost.source === "actual" ? "(実費)" : "(概算)"}
             </div>
-            <div className="w-2 h-2 rounded-full bg-emerald-400" />
+            <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-brand-ssoft text-brand-sakura text-base">
+              💰
+            </span>
           </div>
-          <div className="text-3xl font-bold text-emerald-900 mt-2 tabular-nums">
+          <div className="text-3xl font-extrabold text-brand-green mt-2 tabular-nums leading-none">
             ¥{cost.totalJpy.toLocaleString()}
           </div>
-          <div className="text-[10px] text-emerald-700/70 mt-1 leading-tight space-y-0.5">
+          <div className="text-[10px] text-brand-sub mt-2 leading-tight space-y-0.5">
             <div>
               Gemini ${cost.geminiUsd}（{data.transcriptCount}件 /{" "}
               {(cost.tokensIn / 1000).toFixed(0)}k+
@@ -172,17 +188,20 @@ export default async function DashboardPage({
             </div>
             <div>
               Run ${cost.cloudRunUsd} / Supabase ${cost.supabaseUsd}
-              <span className="text-emerald-600/60">（月額固定）</span>
+              <span className="opacity-70">（月額固定）</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* Daily call trend chart */}
-      <section className="bg-white border rounded-lg p-4">
-        <div className="flex items-baseline justify-between mb-3">
-          <h2 className="font-semibold">日別受電数</h2>
-          <span className="text-xs text-gray-400">
+      <section className="bg-white border border-brand-border rounded-card p-5 shadow-soft">
+        <div className="flex items-center gap-2 mb-4">
+          <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-brand-soft text-base">
+            📊
+          </span>
+          <h2 className="font-bold text-brand-green">日別の受電数</h2>
+          <span className="ml-auto text-xs text-brand-sub">
             棒をクリックでその日の録音一覧
           </span>
         </div>
@@ -194,35 +213,40 @@ export default async function DashboardPage({
 
       {/* Call type breakdown */}
       {data.callTypeBreakdown.length > 0 && (
-        <section className="bg-white border rounded-lg p-4">
-          <h2 className="font-semibold mb-3">通話種別の内訳</h2>
+        <section className="bg-white border border-brand-border rounded-card p-5 shadow-soft">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-brand-soft text-base">
+              🗂️
+            </span>
+            <h2 className="font-bold text-brand-green">通話種別の内訳</h2>
+          </div>
           {(() => {
             const total = data.callTypeBreakdown.reduce(
               (s, c) => s + c.count,
               0
             );
             return (
-              <div className="space-y-2">
-                {data.callTypeBreakdown.map((c) => {
+              <div className="space-y-4">
+                {data.callTypeBreakdown.map((c, idx) => {
                   const pct = total > 0 ? (c.count / total) * 100 : 0;
                   return (
                     <div key={c.type}>
                       <div className="flex items-center justify-between text-sm mb-1">
                         <span
-                          className={`text-xs px-1.5 py-0.5 rounded ${callTypeBadgeClass(c.type)}`}
+                          className={`text-xs px-2 py-0.5 rounded-full font-bold ${callTypeBadgeClass(c.type)}`}
                         >
                           {callTypeLabel(c.type)}
                         </span>
-                        <span className="font-mono text-gray-700">
+                        <span className="font-mono text-brand-ink">
                           {c.count} 件
-                          <span className="text-gray-400 text-xs ml-1">
+                          <span className="text-brand-sub text-xs ml-1">
                             ({pct.toFixed(0)}%)
                           </span>
                         </span>
                       </div>
-                      <div className="h-2 bg-gray-100 rounded overflow-hidden">
+                      <div className="h-2.5 bg-brand-soft rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-indigo-400 rounded"
+                          className={`h-full rounded-full ${idx === 0 ? "bg-brand-green" : "bg-brand-leaf"}`}
                           style={{ width: `${pct}%` }}
                         />
                       </div>
@@ -236,14 +260,21 @@ export default async function DashboardPage({
       )}
 
       {/* Rankings */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {/* Top operators */}
-        <section className="bg-white border rounded-lg p-4">
-          <h2 className="font-semibold mb-3">受電トップオペレーター</h2>
+        <section className="bg-white border border-brand-border rounded-card p-5 shadow-soft">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-brand-soft text-base">
+              🏆
+            </span>
+            <h2 className="font-bold text-brand-green">
+              受電トップオペレーター
+            </h2>
+          </div>
           {data.topOperators.length === 0 ? (
-            <p className="text-sm text-gray-400">データなし</p>
+            <p className="text-sm text-brand-sub">データなし</p>
           ) : (
-            <ol className="space-y-2">
+            <ol className="space-y-3.5">
               {(() => {
                 const max = Math.max(
                   1,
@@ -252,6 +283,7 @@ export default async function DashboardPage({
                 return data.topOperators.map((op, idx) => {
                   const pct = (op.count / max) * 100;
                   const isActive = op.email === operator;
+                  const isTop = idx === 0;
                   return (
                     <li key={op.email}>
                       <Link
@@ -260,28 +292,39 @@ export default async function DashboardPage({
                           start_date: data.rangeStartYmd,
                           end_date: data.rangeEndYmd,
                         }).toString()}`}
-                        className={`block rounded px-2 py-1 -mx-2 transition ${
+                        className={`block rounded-lg px-2 py-1 -mx-2 transition ${
                           isActive
-                            ? "bg-blue-50 ring-1 ring-blue-200"
-                            : "hover:bg-gray-50"
+                            ? "bg-brand-soft ring-1 ring-brand-leaf/40"
+                            : "hover:bg-brand-soft/50"
                         }`}
                       >
                         <div className="flex items-center justify-between text-sm mb-1">
                           <span className="flex items-center gap-2 min-w-0">
-                            <span className="text-gray-400 w-6 text-right">
-                              {idx + 1}.
+                            <span
+                              className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-extrabold ${
+                                isTop
+                                  ? "bg-brand-green text-white"
+                                  : "bg-brand-leaf/25 text-brand-green"
+                              }`}
+                            >
+                              {idx + 1}
                             </span>
-                            <span className="truncate" title={op.email}>
+                            <span
+                              className={`truncate ${isTop ? "font-bold" : ""}`}
+                              title={op.email}
+                            >
                               {op.displayName}
                             </span>
                           </span>
-                          <span className="font-mono text-gray-700 ml-2">
+                          <span
+                            className={`font-mono ml-2 ${isTop ? "text-brand-green font-bold" : "text-brand-ink"}`}
+                          >
                             {op.count} 件
                           </span>
                         </div>
-                        <div className="h-2 bg-gray-100 rounded ml-8 overflow-hidden">
+                        <div className="h-2 bg-brand-soft rounded-full ml-7 overflow-hidden">
                           <div
-                            className="h-full bg-blue-400 rounded"
+                            className={`h-full rounded-full ${isTop ? "bg-brand-green" : "bg-brand-leaf"}`}
                             style={{ width: `${pct}%` }}
                           />
                         </div>
@@ -295,16 +338,22 @@ export default async function DashboardPage({
         </section>
 
         {/* Top products */}
-        <section className="bg-white border rounded-lg p-4">
-          <h2 className="font-semibold mb-3">受電が多い商材</h2>
+        <section className="bg-white border border-brand-border rounded-card p-5 shadow-soft">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-brand-soft text-base">
+              🌿
+            </span>
+            <h2 className="font-bold text-brand-green">受電が多い商材</h2>
+          </div>
           {data.topProducts.length === 0 ? (
-            <p className="text-sm text-gray-400">データなし</p>
+            <p className="text-sm text-brand-sub">データなし</p>
           ) : (
-            <ol className="space-y-2">
+            <ol className="space-y-3.5">
               {(() => {
                 const max = Math.max(1, ...data.topProducts.map((p) => p.count));
                 return data.topProducts.map((p, idx) => {
                   const pct = (p.count / max) * 100;
+                  const isTop = idx === 0;
                   return (
                     <li key={p.name}>
                       <Link
@@ -314,24 +363,35 @@ export default async function DashboardPage({
                           end_date: data.rangeEndYmd,
                           ...(operator ? { operator } : {}),
                         }).toString()}`}
-                        className="block hover:bg-gray-50 rounded px-2 py-1 -mx-2"
+                        className="block hover:bg-brand-soft/50 rounded-lg px-2 py-1 -mx-2"
                       >
                         <div className="flex items-center justify-between text-sm mb-1">
                           <span className="flex items-center gap-2 min-w-0">
-                            <span className="text-gray-400 w-6 text-right">
-                              {idx + 1}.
+                            <span
+                              className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-extrabold ${
+                                isTop
+                                  ? "bg-brand-green text-white"
+                                  : "bg-brand-leaf/25 text-brand-green"
+                              }`}
+                            >
+                              {idx + 1}
                             </span>
-                            <span className="truncate" title={p.name}>
+                            <span
+                              className={`truncate ${isTop ? "font-bold" : ""}`}
+                              title={p.name}
+                            >
                               {p.name}
                             </span>
                           </span>
-                          <span className="font-mono text-gray-700 ml-2">
+                          <span
+                            className={`font-mono ml-2 ${isTop ? "text-brand-green font-bold" : "text-brand-ink"}`}
+                          >
                             {p.count} 件
                           </span>
                         </div>
-                        <div className="h-2 bg-gray-100 rounded ml-8 overflow-hidden">
+                        <div className="h-2 bg-brand-soft rounded-full ml-7 overflow-hidden">
                           <div
-                            className="h-full bg-emerald-400 rounded"
+                            className={`h-full rounded-full ${isTop ? "bg-brand-green" : "bg-brand-leaf"}`}
                             style={{ width: `${pct}%` }}
                           />
                         </div>
@@ -346,19 +406,24 @@ export default async function DashboardPage({
       </div>
 
       {/* Proposal success ranking */}
-      <section className="bg-white border rounded-lg p-4">
-        <h2 className="font-semibold mb-3">提案成功ランキング</h2>
+      <section className="bg-white border border-brand-border rounded-card p-5 shadow-soft">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-brand-soft text-base">
+            🎯
+          </span>
+          <h2 className="font-bold text-brand-green">提案成功ランキング</h2>
+        </div>
         {data.proposalSuccess.length === 0 ? (
-          <p className="text-sm text-gray-400">データなし</p>
+          <p className="text-sm text-brand-sub">データなし</p>
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-xs text-gray-500 border-b">
-                <th className="py-2 pr-3">項目</th>
-                <th className="py-2 pr-3 text-right">成功</th>
-                <th className="py-2 pr-3 text-right">提案数</th>
-                <th className="py-2 pr-3 w-48">成功率</th>
-                <th className="py-2 text-right">率</th>
+              <tr className="text-left text-xs text-brand-sub bg-brand-soft">
+                <th className="py-2 px-3 rounded-l-lg">項目</th>
+                <th className="py-2 px-3 text-right">成功</th>
+                <th className="py-2 px-3 text-right">提案数</th>
+                <th className="py-2 px-3 w-48">成功率</th>
+                <th className="py-2 px-3 text-right rounded-r-lg">率</th>
               </tr>
             </thead>
             <tbody>
@@ -367,13 +432,16 @@ export default async function DashboardPage({
                   row.proposed > 0 ? (row.success / row.proposed) * 100 : 0;
                 const rateColor =
                   rate >= 50
-                    ? "bg-emerald-500"
+                    ? "bg-brand-green"
                     : rate >= 25
-                    ? "bg-amber-400"
-                    : "bg-rose-400";
+                    ? "bg-brand-leaf"
+                    : "bg-brand-sakura";
                 return (
-                  <tr key={row.key} className="border-b last:border-b-0">
-                    <td className="py-2 pr-3">
+                  <tr
+                    key={row.key}
+                    className="border-b border-brand-border last:border-b-0"
+                  >
+                    <td className="py-3.5 px-3">
                       <Link
                         href={`/recordings?${new URLSearchParams({
                           success: row.key,
@@ -381,26 +449,26 @@ export default async function DashboardPage({
                           end_date: data.rangeEndYmd,
                           ...(operator ? { operator } : {}),
                         }).toString()}`}
-                        className="hover:underline"
+                        className="text-brand-green hover:underline"
                       >
                         {PROPOSAL_LABEL_BY_KEY.get(row.key) ?? row.key}
                       </Link>
                     </td>
-                    <td className="py-2 pr-3 text-right font-mono text-green-700">
+                    <td className="py-3.5 px-3 text-right font-mono text-brand-green font-bold">
                       {row.success}
                     </td>
-                    <td className="py-2 pr-3 text-right font-mono text-gray-600">
+                    <td className="py-3.5 px-3 text-right font-mono text-brand-sub">
                       {row.proposed}
                     </td>
-                    <td className="py-2 pr-3">
-                      <div className="h-2 bg-gray-100 rounded overflow-hidden">
+                    <td className="py-3.5 px-3">
+                      <div className="h-2 bg-brand-soft rounded-full overflow-hidden">
                         <div
-                          className={`h-full ${rateColor} rounded`}
+                          className={`h-full ${rateColor} rounded-full`}
                           style={{ width: `${rate}%` }}
                         />
                       </div>
                     </td>
-                    <td className="py-2 text-right font-mono">
+                    <td className="py-3.5 px-3 text-right font-mono">
                       {rate.toFixed(1)}%
                     </td>
                   </tr>
@@ -414,7 +482,7 @@ export default async function DashboardPage({
       <div className="text-center mt-6">
         <Link
           href={`/recordings?${recordingsBaseQs}`}
-          className="inline-block bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700"
+          className="inline-block bg-brand-green text-white px-6 py-2.5 rounded-xl font-bold hover:bg-brand-dark hover:-translate-y-0.5 transition shadow-soft"
         >
           全録音一覧を見る（このフィルタを引き継ぐ）
         </Link>

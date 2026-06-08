@@ -117,39 +117,47 @@ export default async function ProductsPage() {
 
   return (
     <section className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">商品マスター</h1>
-        <p className="text-sm text-gray-600 mt-1">
+      <header>
+        <div className="text-xs font-bold text-brand-leaf tracking-widest">
+          PRODUCTS
+        </div>
+        <h1 className="text-3xl font-extrabold text-brand-green">
+          商品マスター
+        </h1>
+        <div className="mt-1 h-1 w-12 rounded-full bg-brand-sakura" />
+        <p className="text-sm text-brand-sub mt-2">
           書き起こし時にGeminiが参照する商品辞書を管理します。表記をここで揃えると、録音の「商品」列にもこの正式表記で記録されます。
         </p>
-      </div>
+      </header>
 
       <AddProductForm action={addProduct} />
 
-      <div className="bg-white rounded shadow divide-y">
-        <div className="grid grid-cols-12 gap-3 px-4 py-2 bg-gray-100 text-xs text-gray-600 font-medium">
+      <div className="bg-white border border-brand-border rounded-card shadow-soft overflow-hidden">
+        <div className="grid grid-cols-12 gap-3 px-4 py-3 bg-brand-soft text-xs text-brand-sub font-bold">
           <div className="col-span-4">商品名</div>
           <div className="col-span-3">かな</div>
           <div className="col-span-1">並び順</div>
           <div className="col-span-1">状態</div>
           <div className="col-span-3 text-right">操作</div>
         </div>
-        {products.map((p) => (
-          <ProductRow
-            key={p.id}
-            product={p}
-            updateAction={updateProduct}
-            toggleAction={toggleActive}
-          />
-        ))}
+        <div className="divide-y divide-brand-border">
+          {products.map((p) => (
+            <ProductRow
+              key={p.id}
+              product={p}
+              updateAction={updateProduct}
+              toggleAction={toggleActive}
+            />
+          ))}
+        </div>
         {products.length === 0 && (
-          <div className="px-4 py-8 text-center text-gray-500 text-sm">
+          <div className="px-4 py-8 text-center text-brand-sub text-sm">
             商品がまだ登録されていません
           </div>
         )}
       </div>
 
-      <p className="text-xs text-gray-500">
+      <p className="text-xs text-brand-sub">
         ※ 無効化した商品はGeminiの辞書から外れます。過去の録音に記録された商品名はそのまま残ります。
       </p>
     </section>

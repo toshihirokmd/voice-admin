@@ -34,8 +34,8 @@ export function GenerateReportButton({
 
   const baseCls =
     variant === "primary"
-      ? "bg-blue-600 text-white hover:bg-blue-700"
-      : "bg-white text-blue-700 border border-blue-300 hover:bg-blue-50";
+      ? "bg-brand-green text-white rounded-xl font-bold hover:bg-brand-dark"
+      : "bg-white border border-brand-border text-brand-sub hover:bg-brand-soft rounded-lg font-medium";
 
   return (
     <div className="space-y-1">
@@ -43,7 +43,7 @@ export function GenerateReportButton({
         type="button"
         onClick={handleClick}
         disabled={isPending}
-        className={`inline-flex items-center gap-2 px-4 py-2 rounded text-sm font-medium transition ${baseCls} ${
+        className={`inline-flex items-center gap-2 px-4 py-2 text-sm transition ${baseCls} ${
           isPending ? "opacity-60 cursor-not-allowed" : ""
         }`}
       >
@@ -52,8 +52,8 @@ export function GenerateReportButton({
         )}
         {isPending ? "生成中…（30秒程度）" : label}
       </button>
-      {error && <p className="text-xs text-red-600">{error}</p>}
-      {info && <p className="text-xs text-emerald-700">{info}</p>}
+      {error && <p className="text-xs text-brand-sakura">{error}</p>}
+      {info && <p className="text-xs text-brand-green">{info}</p>}
     </div>
   );
 }

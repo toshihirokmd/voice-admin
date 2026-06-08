@@ -28,32 +28,38 @@ export function AddProductForm({ action }: { action: ProductAction }) {
   return (
     <form
       action={formAction}
-      className="bg-white rounded shadow p-4 grid grid-cols-1 sm:grid-cols-4 gap-3 items-end"
+      className="bg-white border border-brand-border rounded-card shadow-soft p-5 grid grid-cols-1 sm:grid-cols-4 gap-5 items-end"
     >
+      <div className="sm:col-span-4 flex items-center gap-2">
+        <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-brand-soft text-base">
+          ➕
+        </span>
+        <h2 className="font-bold text-brand-green">商品を追加</h2>
+      </div>
       <div>
-        <label className="block text-xs text-gray-500 mb-1">商品名 *</label>
+        <label className="block text-xs text-brand-sub mb-1">商品名 *</label>
         <input
           name="name"
           required
           placeholder="例: 新商品X"
-          className="w-full border rounded px-2 py-1 text-sm"
+          className="w-full border border-brand-border rounded-lg bg-white px-2 py-1.5 text-sm focus:ring-2 focus:ring-brand-leaf focus:border-brand-leaf outline-none"
         />
       </div>
       <div>
-        <label className="block text-xs text-gray-500 mb-1">かな（任意）</label>
+        <label className="block text-xs text-brand-sub mb-1">かな（任意）</label>
         <input
           name="kana"
           placeholder="例: しんしょうひんえっくす"
-          className="w-full border rounded px-2 py-1 text-sm"
+          className="w-full border border-brand-border rounded-lg bg-white px-2 py-1.5 text-sm focus:ring-2 focus:ring-brand-leaf focus:border-brand-leaf outline-none"
         />
       </div>
       <div>
-        <label className="block text-xs text-gray-500 mb-1">並び順</label>
+        <label className="block text-xs text-brand-sub mb-1">並び順</label>
         <input
           name="sort_order"
           type="number"
           defaultValue={100}
-          className="w-full border rounded px-2 py-1 text-sm"
+          className="w-full border border-brand-border rounded-lg bg-white px-2 py-1.5 text-sm focus:ring-2 focus:ring-brand-leaf focus:border-brand-leaf outline-none"
         />
       </div>
       <div className="flex flex-col gap-1">
@@ -65,7 +71,7 @@ export function AddProductForm({ action }: { action: ProductAction }) {
           errorLabel="✕ 追加失敗"
         />
         {state?.ok === false && (
-          <p className="text-xs text-red-600">{state.message}</p>
+          <p className="text-xs text-brand-sakura">{state.message}</p>
         )}
       </div>
     </form>
@@ -92,8 +98,8 @@ export function ProductRow({
 
   return (
     <div
-      className={`grid grid-cols-12 gap-3 px-4 py-2 items-center text-sm ${
-        !product.is_active ? "bg-gray-50 text-gray-400" : ""
+      className={`grid grid-cols-12 gap-3 px-4 py-3 items-center text-sm text-brand-ink ${
+        !product.is_active ? "bg-brand-soft text-brand-sub" : ""
       }`}
     >
       <form action={updateFormAction} className="contents">
@@ -102,25 +108,25 @@ export function ProductRow({
           name="name"
           defaultValue={product.name}
           required
-          className="col-span-4 border rounded px-2 py-1"
+          className="col-span-4 border border-brand-border rounded-lg bg-white px-2 py-1.5 focus:ring-2 focus:ring-brand-leaf focus:border-brand-leaf outline-none"
         />
         <input
           name="kana"
           defaultValue={product.kana ?? ""}
-          className="col-span-3 border rounded px-2 py-1"
+          className="col-span-3 border border-brand-border rounded-lg bg-white px-2 py-1.5 focus:ring-2 focus:ring-brand-leaf focus:border-brand-leaf outline-none"
         />
         <input
           name="sort_order"
           type="number"
           defaultValue={product.sort_order}
-          className="col-span-1 border rounded px-2 py-1"
+          className="col-span-1 border border-brand-border rounded-lg bg-white px-2 py-1.5 focus:ring-2 focus:ring-brand-leaf focus:border-brand-leaf outline-none"
         />
         <div className="col-span-1">
           <span
-            className={`text-xs px-2 py-0.5 rounded ${
+            className={`text-xs px-2 py-0.5 rounded-full font-bold ${
               product.is_active
-                ? "bg-green-100 text-green-800"
-                : "bg-gray-200 text-gray-600"
+                ? "bg-brand-soft text-brand-green"
+                : "bg-brand-ssoft text-brand-sakura"
             }`}
           >
             {product.is_active ? "有効" : "無効"}

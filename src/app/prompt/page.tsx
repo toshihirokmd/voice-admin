@@ -53,7 +53,7 @@ export default async function PromptPage() {
     .maybeSingle();
 
   if (error) {
-    return <p className="text-red-600">エラー: {error.message}</p>;
+    return <p className="text-brand-sakura">エラー: {error.message}</p>;
   }
 
   const meta = `最終更新: ${
@@ -66,23 +66,34 @@ export default async function PromptPage() {
   }${data?.updated_by_email ? `（${data.updated_by_email}）` : ""}`;
 
   return (
-    <section className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold">プロンプト編集</h1>
-        <p className="text-sm text-gray-600 mt-1">
+    <section className="space-y-6">
+      <header>
+        <div className="text-xs font-bold text-brand-leaf tracking-widest">
+          PROMPT
+        </div>
+        <h1 className="text-3xl font-extrabold text-brand-green">
+          プロンプト編集
+        </h1>
+        <div className="mt-1 h-1 w-12 rounded-full bg-brand-sakura" />
+        <p className="text-sm text-brand-sub mt-2">
           Geminiに渡すプロンプト本文を編集します。保存すると次の録音から即座に新プロンプトが使われます。
         </p>
-      </div>
+      </header>
 
-      <div className="bg-amber-50 border border-amber-200 rounded p-3 text-sm">
-        <p className="font-semibold mb-1">プレースホルダ</p>
-        <ul className="list-disc list-inside space-y-0.5">
+      <div className="bg-white border border-brand-border rounded-card p-5 shadow-soft text-sm">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-brand-soft text-base">
+            📝
+          </span>
+          <p className="font-bold text-brand-green">プレースホルダ</p>
+        </div>
+        <ul className="list-disc list-inside space-y-0.5 text-brand-ink">
           <li>
-            <code className="bg-white px-1 py-0.5 rounded">{"{{PRODUCT_DICTIONARY}}"}</code>:
+            <code className="bg-brand-soft text-brand-green px-1 py-0.5 rounded">{"{{PRODUCT_DICTIONARY}}"}</code>:
             Native Hostが自動で商品辞書(products.json)に置換します。
           </li>
           <li>
-            <code className="bg-white px-1 py-0.5 rounded">{"{{CHUNK_INDEX}}"}</code>:
+            <code className="bg-brand-soft text-brand-green px-1 py-0.5 rounded">{"{{CHUNK_INDEX}}"}</code>:
             分割転写時のチャンク番号(1, 2, ...)に置換されます。
           </li>
         </ul>

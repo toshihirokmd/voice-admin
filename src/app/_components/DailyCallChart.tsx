@@ -91,12 +91,11 @@ export function DailyCallChart({ data, operatorParam }: Props) {
                   y={y}
                   width={Math.max(2, barW)}
                   height={Math.max(0, h)}
-                  fill="#3b82f6"
-                  className="hover:fill-blue-700 cursor-pointer transition-colors"
+                  rx={3}
+                  fill="#54AF77"
+                  className="hover:fill-[#17683B] cursor-pointer transition-colors"
                 >
-                  <title>
-                    {d.date}: {d.count} 件
-                  </title>
+                  <title>{`${d.date}: ${d.count} 件`}</title>
                 </rect>
               </Link>
               {/* 値（高めの bar のみ表示） */}

@@ -66,10 +66,14 @@ export default async function MyPage() {
     }).toString();
 
   return (
-    <section className="space-y-5">
+    <section className="space-y-6">
       <header>
-        <h1 className="text-2xl font-bold">マイページ</h1>
-        <p className="text-xs text-gray-500 mt-1">
+        <div className="text-xs font-bold text-brand-leaf tracking-widest">
+          MY PAGE
+        </div>
+        <h1 className="text-3xl font-extrabold text-brand-green">マイページ</h1>
+        <div className="mt-1 h-1 w-12 rounded-full bg-brand-sakura" />
+        <p className="text-xs text-brand-sub mt-2">
           {user.displayName ?? user.email} の今月の成果（{me.rangeStartYmd} 〜{" "}
           {me.rangeEndYmd}）
         </p>
@@ -82,67 +86,73 @@ export default async function MyPage() {
       />
 
       {/* 個人 KPI + 全体平均比較 */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="flex items-center gap-2">
+        <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-brand-soft text-base">
+          ✨
+        </span>
+        <h2 className="font-bold text-brand-green">今月の実績</h2>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
         <Link
           href={`/recordings?${recordingsBaseQs()}`}
-          className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-4 hover:shadow-md transition"
+          className="rounded-card p-5 shadow-softlg bg-gradient-to-br from-brand-green to-brand-dark text-white hover:-translate-y-0.5 transition"
         >
-          <div className="text-xs font-semibold text-blue-700 uppercase tracking-wider">
+          <div className="text-xs font-bold text-white/80 tracking-wider">
             今月の受電
           </div>
-          <div className="text-4xl font-bold text-blue-900 mt-2 tabular-nums">
+          <div className="text-4xl font-extrabold text-white mt-2 tabular-nums leading-none">
             {me.rangeCallCount}
           </div>
           <CompareLine
             label="全体平均"
             self={me.rangeCallCount}
             global={global.avgCallsPerOperator}
-            colorClass="text-blue-700/70"
+            colorClass="text-white/75"
             higherIsBetter
             unit="件"
           />
         </Link>
 
-        <div className="bg-gradient-to-br from-violet-50 to-violet-100 border border-violet-200 rounded-xl p-4">
-          <div className="text-xs font-semibold text-violet-700 uppercase tracking-wider">
+        <div className="bg-brand-soft rounded-card p-5">
+          <div className="text-xs font-bold text-brand-green tracking-wider">
             平均通話時間
           </div>
-          <div className="text-4xl font-bold text-violet-900 mt-2 tabular-nums">
+          <div className="text-4xl font-extrabold text-brand-green mt-2 tabular-nums leading-none">
             {formatDurationSec(me.avgDurationSec)}
           </div>
           <CompareLineDuration
             self={me.avgDurationSec}
             global={global.avgDurationSec}
-            colorClass="text-violet-700/70"
+            colorClass="text-brand-sub"
           />
         </div>
 
-        <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 rounded-xl p-4">
-          <div className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">
+        <div className="bg-brand-soft rounded-card p-5">
+          <div className="text-xs font-bold text-brand-green tracking-wider">
             提案成功率
           </div>
-          <div className="text-4xl font-bold text-emerald-900 mt-2 tabular-nums">
+          <div className="text-4xl font-extrabold text-brand-green mt-2 tabular-nums leading-none">
             {meRate != null ? `${meRate.toFixed(1)}%` : "-"}
           </div>
           <CompareLine
             label="全体平均"
             self={meRate}
             global={globalOverallRate}
-            colorClass="text-emerald-700/70"
+            colorClass="text-brand-sub"
             higherIsBetter
             unit="%"
             decimals={1}
           />
         </div>
 
-        <div className="bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-200 rounded-xl p-4">
-          <div className="text-xs font-semibold text-amber-700 uppercase tracking-wider">
+        <div className="bg-brand-soft rounded-card p-5">
+          <div className="text-xs font-bold text-brand-green tracking-wider">
             総通話時間
           </div>
-          <div className="text-3xl font-bold text-amber-900 mt-2 tabular-nums">
+          <div className="text-3xl font-extrabold text-brand-green mt-2 tabular-nums leading-none">
             {formatHoursMin(myTotalDurationSec)}
           </div>
-          <div className="text-[10px] text-amber-700/70 mt-1">
+          <div className="text-[10px] text-brand-sub mt-1">
             {me.rangeCallCount}件 ×{" "}
             {formatDurationSec(me.avgDurationSec)}
           </div>
@@ -150,14 +160,19 @@ export default async function MyPage() {
       </div>
 
       {/* 前月比 */}
-      <section className="bg-white border rounded-lg p-4">
+      <section className="bg-white border border-brand-border rounded-card p-5 shadow-soft">
         <div className="flex items-baseline justify-between mb-3">
-          <h2 className="font-semibold">先月との比較</h2>
-          <span className="text-xs text-gray-400">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-brand-soft text-base">
+              📅
+            </span>
+            <h2 className="font-bold text-brand-green">先月との比較</h2>
+          </div>
+          <span className="text-xs text-brand-sub">
             {prevRange.label}（{prevRange.startYmd} 〜 {prevRange.endYmd}）
           </span>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           <DiffCard
             title="受電数"
             current={me.rangeCallCount}
@@ -187,13 +202,18 @@ export default async function MyPage() {
       {todayReport ? (
         <DailyReportView report={todayReport} />
       ) : (
-        <section className="bg-white border rounded-lg p-4 flex flex-wrap items-center justify-between gap-3">
+        <section className="bg-white border border-brand-border rounded-card p-5 shadow-soft flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="font-semibold">今日のレポート</h2>
-            <p className="text-xs text-gray-500 mt-1">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-brand-soft text-base">
+                📝
+              </span>
+              <h2 className="font-bold text-brand-green">今日のレポート</h2>
+            </div>
+            <p className="text-xs text-brand-sub mt-1">
               本日（{todayYmd}）の通話を AI に分析させて、注目したい4カテゴリの会話を抽出します。
             </p>
-            <p className="text-[10px] text-gray-400 mt-1">
+            <p className="text-[10px] text-brand-sub mt-1">
               生成コスト: 1回あたり 約 ¥0.2（任意なので押した時だけ）
             </p>
           </div>
@@ -202,10 +222,15 @@ export default async function MyPage() {
       )}
 
       {/* 日別チャート */}
-      <section className="bg-white border rounded-lg p-4">
+      <section className="bg-white border border-brand-border rounded-card p-5 shadow-soft">
         <div className="flex items-baseline justify-between mb-3">
-          <h2 className="font-semibold">日別の受電数</h2>
-          <span className="text-xs text-gray-400">棒クリックで詳細</span>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-brand-soft text-base">
+              📊
+            </span>
+            <h2 className="font-bold text-brand-green">日別の受電数</h2>
+          </div>
+          <span className="text-xs text-brand-sub">棒クリックで詳細</span>
         </div>
         <DailyCallChart
           data={me.dailyCalls}
@@ -215,8 +240,13 @@ export default async function MyPage() {
 
       {/* 通話種別の内訳 */}
       {me.callTypeBreakdown.length > 0 && (
-        <section className="bg-white border rounded-lg p-4">
-          <h2 className="font-semibold mb-3">通話種別の内訳</h2>
+        <section className="bg-white border border-brand-border rounded-card p-5 shadow-soft">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-brand-soft text-base">
+              🗂️
+            </span>
+            <h2 className="font-bold text-brand-green">通話種別の内訳</h2>
+          </div>
           {(() => {
             const total = me.callTypeBreakdown.reduce((s, c) => s + c.count, 0);
             return (
@@ -227,20 +257,20 @@ export default async function MyPage() {
                     <div key={c.type}>
                       <div className="flex items-center justify-between text-sm mb-1">
                         <span
-                          className={`text-xs px-1.5 py-0.5 rounded ${callTypeBadgeClass(c.type)}`}
+                          className={`text-xs px-2 py-0.5 rounded-full font-bold ${callTypeBadgeClass(c.type)}`}
                         >
                           {callTypeLabel(c.type)}
                         </span>
-                        <span className="font-mono text-gray-700">
+                        <span className="font-mono text-brand-ink">
                           {c.count} 件
-                          <span className="text-gray-400 text-xs ml-1">
+                          <span className="text-brand-sub text-xs ml-1">
                             ({pct.toFixed(0)}%)
                           </span>
                         </span>
                       </div>
-                      <div className="h-2 bg-gray-100 rounded overflow-hidden">
+                      <div className="h-2 bg-brand-soft rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-indigo-400 rounded"
+                          className="h-full bg-brand-leaf rounded-full"
                           style={{ width: `${pct}%` }}
                         />
                       </div>
@@ -254,11 +284,16 @@ export default async function MyPage() {
       )}
 
       {/* 商材ランク + 提案テーブル */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <section className="bg-white border rounded-lg p-4">
-          <h2 className="font-semibold mb-3">よく対応した商材</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <section className="bg-white border border-brand-border rounded-card p-5 shadow-soft">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-brand-soft text-base">
+              🌿
+            </span>
+            <h2 className="font-bold text-brand-green">よく対応した商材</h2>
+          </div>
           {me.topProducts.length === 0 ? (
-            <p className="text-sm text-gray-400">データなし</p>
+            <p className="text-sm text-brand-sub">データなし</p>
           ) : (
             <ol className="space-y-2">
               {(() => {
@@ -269,24 +304,24 @@ export default async function MyPage() {
                     <li key={p.name}>
                       <Link
                         href={`/recordings?${recordingsBaseQs({ product: p.name })}`}
-                        className="block hover:bg-gray-50 rounded px-2 py-1 -mx-2"
+                        className="block hover:bg-brand-soft/50 rounded-lg px-2 py-1 -mx-2"
                       >
                         <div className="flex items-center justify-between text-sm mb-1">
                           <span className="flex items-center gap-2 min-w-0">
-                            <span className="text-gray-400 w-6 text-right">
+                            <span className="text-brand-sub w-6 text-right">
                               {idx + 1}.
                             </span>
-                            <span className="truncate" title={p.name}>
+                            <span className="truncate text-brand-ink" title={p.name}>
                               {p.name}
                             </span>
                           </span>
-                          <span className="font-mono text-gray-700 ml-2">
+                          <span className="font-mono text-brand-ink ml-2">
                             {p.count} 件
                           </span>
                         </div>
-                        <div className="h-2 bg-gray-100 rounded ml-8 overflow-hidden">
+                        <div className="h-2 bg-brand-soft rounded-full ml-8 overflow-hidden">
                           <div
-                            className="h-full bg-emerald-400 rounded"
+                            className="h-full bg-brand-leaf rounded-full"
                             style={{ width: `${pct}%` }}
                           />
                         </div>
@@ -299,18 +334,23 @@ export default async function MyPage() {
           )}
         </section>
 
-        <section className="bg-white border rounded-lg p-4">
-          <h2 className="font-semibold mb-3">あなたの提案成功</h2>
+        <section className="bg-white border border-brand-border rounded-card p-5 shadow-soft">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-brand-soft text-base">
+              🎯
+            </span>
+            <h2 className="font-bold text-brand-green">あなたの提案成功</h2>
+          </div>
           {me.proposalSuccess.length === 0 ? (
-            <p className="text-sm text-gray-400">データなし</p>
+            <p className="text-sm text-brand-sub">データなし</p>
           ) : (
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-xs text-gray-500 border-b">
-                  <th className="py-2 pr-2">項目</th>
-                  <th className="py-2 pr-2 text-right">成功</th>
-                  <th className="py-2 pr-2 text-right">提案</th>
-                  <th className="py-2 text-right">率 / 全体</th>
+                <tr className="text-left text-xs text-brand-sub bg-brand-soft">
+                  <th className="py-2 px-3 rounded-l-lg">項目</th>
+                  <th className="py-2 px-3 text-right">成功</th>
+                  <th className="py-2 px-3 text-right">提案</th>
+                  <th className="py-2 px-3 text-right rounded-r-lg">率 / 全体</th>
                 </tr>
               </thead>
               <tbody>
@@ -321,35 +361,35 @@ export default async function MyPage() {
                   const better =
                     globalRate != null ? rate >= globalRate : null;
                   return (
-                    <tr key={row.key} className="border-b last:border-b-0">
-                      <td className="py-2 pr-2">
+                    <tr key={row.key} className="border-b border-brand-border last:border-b-0">
+                      <td className="py-2 px-3">
                         <Link
                           href={`/recordings?${recordingsBaseQs({ success: row.key })}`}
-                          className="hover:underline"
+                          className="text-brand-green hover:underline"
                         >
                           {PROPOSAL_LABEL_BY_KEY.get(row.key) ?? row.key}
                         </Link>
                       </td>
-                      <td className="py-2 pr-2 text-right font-mono text-green-700">
+                      <td className="py-2 px-3 text-right font-mono text-brand-green font-bold">
                         {row.success}
                       </td>
-                      <td className="py-2 pr-2 text-right font-mono text-gray-600">
+                      <td className="py-2 px-3 text-right font-mono text-brand-sub">
                         {row.proposed}
                       </td>
-                      <td className="py-2 text-right font-mono text-xs">
+                      <td className="py-2 px-3 text-right font-mono text-xs">
                         <span
                           className={
                             better === true
-                              ? "text-emerald-700 font-semibold"
+                              ? "text-brand-green font-bold"
                               : better === false
-                              ? "text-gray-500"
-                              : "text-gray-700"
+                              ? "text-brand-sub"
+                              : "text-brand-ink"
                           }
                         >
                           {rate.toFixed(1)}%
                         </span>
                         {globalRate != null && (
-                          <span className="text-gray-400 text-[10px]">
+                          <span className="text-brand-sub text-[10px]">
                             {" / "}
                             {globalRate.toFixed(1)}%
                           </span>
@@ -367,7 +407,7 @@ export default async function MyPage() {
       <div className="text-center mt-6">
         <Link
           href={`/recordings?${recordingsBaseQs()}`}
-          className="inline-block bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700"
+          className="inline-block bg-brand-green text-white px-6 py-2.5 rounded-xl font-bold hover:bg-brand-dark hover:-translate-y-0.5 transition shadow-soft"
         >
           自分の録音を全部見る
         </Link>
@@ -400,11 +440,11 @@ function CompareLine({
   const better = higherIsBetter ? diff >= 0 : diff <= 0;
   const arrow = diff > 0 ? "↑" : diff < 0 ? "↓" : "→";
   const diffText = `${arrow} ${Math.abs(diff).toFixed(decimals)}${unit}`;
-  const cls = better ? "text-emerald-700" : "text-gray-500";
+  const cls = better ? "text-brand-leaf font-bold" : "text-brand-sakura";
   return (
     <div className={`text-[10px] mt-1 ${colorClass}`}>
       {label} {global.toFixed(decimals)}
-      {unit}（<span className={`${cls} font-semibold`}>{diffText}</span>）
+      {unit}（<span className={cls}>{diffText}</span>）
     </div>
   );
 }
@@ -459,13 +499,13 @@ function DiffCard({
 
   let arrow = "→";
   let diffText = "変化なし";
-  let colorCls = "text-gray-500";
+  let colorCls = "text-brand-sub";
   if (current != null && previous != null) {
     const diff = current - previous;
     if (Math.abs(diff) > 0.0001) {
       arrow = diff > 0 ? "↑" : "↓";
       const better = higherIsBetter ? diff > 0 : diff < 0;
-      colorCls = better ? "text-emerald-700" : "text-rose-600";
+      colorCls = better ? "text-brand-green" : "text-brand-sakura";
       if (formatter) {
         diffText = `${arrow} ${formatter(Math.abs(diff))}`;
       } else {
@@ -475,13 +515,13 @@ function DiffCard({
   }
 
   return (
-    <div className="border rounded-lg p-3">
-      <div className="text-xs text-gray-500">{title}</div>
+    <div className="bg-brand-soft rounded-xl p-3">
+      <div className="text-xs text-brand-sub">{title}</div>
       <div className="flex items-baseline gap-2 mt-1">
-        <span className="text-2xl font-bold tabular-nums">{fmt(current)}</span>
-        <span className="text-xs text-gray-400">/ 先月 {fmt(previous)}</span>
+        <span className="text-2xl font-extrabold text-brand-green tabular-nums">{fmt(current)}</span>
+        <span className="text-xs text-brand-sub">/ 先月 {fmt(previous)}</span>
       </div>
-      <div className={`text-xs font-semibold mt-1 ${colorCls}`}>{diffText}</div>
+      <div className={`text-xs font-bold mt-1 ${colorCls}`}>{diffText}</div>
     </div>
   );
 }

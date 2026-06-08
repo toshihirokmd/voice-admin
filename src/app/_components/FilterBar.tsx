@@ -57,23 +57,23 @@ export function FilterBar({
 
   return (
     <div
-      className={`bg-white border rounded-lg p-3 flex flex-wrap items-center gap-3 sticky top-0 z-10 shadow-sm ${
+      className={`bg-white border border-brand-border rounded-card p-3 flex flex-wrap items-center gap-3 sticky top-0 z-10 shadow-soft ${
         isPending ? "opacity-60" : ""
       }`}
     >
       {/* 期間プリセット */}
-      <div className="flex flex-wrap items-center gap-1">
-        <span className="text-xs text-gray-500 mr-1">期間:</span>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-xs font-bold text-brand-sub mr-1">期間:</span>
         {PRESETS.map((p) => {
           const active = currentPreset === p.key;
           return (
             <button
               key={p.key}
               onClick={() => selectPreset(p.key)}
-              className={`text-xs px-2.5 py-1 rounded border transition ${
+              className={`text-xs px-3 py-1.5 rounded-lg border transition font-bold ${
                 active
-                  ? "bg-blue-600 text-white border-blue-600"
-                  : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                  ? "bg-brand-green text-white border-brand-green"
+                  : "bg-white text-brand-sub border-brand-border hover:bg-brand-soft"
               }`}
             >
               {p.label}
@@ -82,10 +82,10 @@ export function FilterBar({
         })}
         <button
           onClick={() => selectPreset("custom")}
-          className={`text-xs px-2.5 py-1 rounded border transition ${
+          className={`text-xs px-3 py-1.5 rounded-lg border transition font-bold ${
             currentPreset === "custom"
-              ? "bg-blue-600 text-white border-blue-600"
-              : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+              ? "bg-brand-green text-white border-brand-green"
+              : "bg-white text-brand-sub border-brand-border hover:bg-brand-soft"
           }`}
         >
           カスタム
@@ -101,9 +101,9 @@ export function FilterBar({
             onChange={(e) =>
               updateParams({ period: "custom", start: e.target.value })
             }
-            className="border rounded px-2 py-1"
+            className="border border-brand-border rounded-lg px-2 py-1.5 bg-white"
           />
-          <span className="text-gray-400">〜</span>
+          <span className="text-brand-sub">〜</span>
           <input
             type="date"
             value={currentEndYmd}
@@ -111,7 +111,7 @@ export function FilterBar({
             onChange={(e) =>
               updateParams({ period: "custom", end: e.target.value })
             }
-            className="border rounded px-2 py-1"
+            className="border border-brand-border rounded-lg px-2 py-1.5 bg-white"
           />
         </div>
       )}
@@ -120,13 +120,13 @@ export function FilterBar({
 
       {/* オペレーター */}
       <div className="flex items-center gap-2">
-        <span className="text-xs text-gray-500">オペレーター:</span>
+        <span className="text-xs font-bold text-brand-sub">オペレーター:</span>
         <select
           value={currentOperator}
           onChange={(e) =>
             updateParams({ operator: e.target.value || null })
           }
-          className="text-xs border rounded px-2 py-1 bg-white"
+          className="text-xs border border-brand-border rounded-lg px-2 py-1.5 bg-white text-brand-ink"
         >
           <option value="">全員</option>
           {operators.map((op) => (
@@ -142,7 +142,7 @@ export function FilterBar({
                 router.push("/");
               })
             }
-            className="text-xs px-2 py-1 rounded border bg-white text-gray-600 hover:bg-gray-50"
+            className="text-xs px-3 py-1.5 rounded-lg border border-brand-border bg-white text-brand-sub hover:bg-brand-ssoft hover:text-brand-sakura transition"
           >
             リセット
           </button>

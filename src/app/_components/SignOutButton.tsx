@@ -13,7 +13,7 @@ export function SignOutButton() {
     <form action={signOut}>
       <button
         type="submit"
-        className="inline-flex items-center gap-1.5 text-gray-500 hover:text-red-600 hover:underline transition text-sm"
+        className="inline-flex items-center gap-1.5 ml-2 px-3 py-1.5 rounded-lg border border-brand-border text-brand-sub hover:bg-brand-ssoft hover:text-brand-sakura transition text-sm"
         title="ログアウト"
       >
         <svg

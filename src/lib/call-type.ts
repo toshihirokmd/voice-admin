@@ -25,10 +25,10 @@ export function callTypeLabel(value: string | null | undefined): string {
   return CALL_TYPE_LABELS[value] ?? value;
 }
 
-/** バッジ色: 受電=青系 / 掛電=橙系 / その他=灰 */
+/** バッジ色: 受電=緑系 / 掛電=淡桜系 / その他=淡緑（ブランド統一） */
 export function callTypeBadgeClass(value: string | null | undefined): string {
-  if (value === "talk_recv") return "bg-blue-100 text-blue-700";
-  if (value === "talk_call") return "bg-amber-100 text-amber-700";
-  if (!value) return "bg-gray-100 text-gray-400";
-  return "bg-gray-100 text-gray-600";
+  if (value === "talk_recv") return "bg-brand-soft text-brand-green";
+  if (value === "talk_call") return "bg-brand-ssoft text-brand-sakura";
+  if (!value) return "bg-brand-soft text-brand-sub";
+  return "bg-brand-soft text-brand-sub";
 }

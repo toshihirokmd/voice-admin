@@ -36,33 +36,33 @@ const CATEGORIES: Array<{
     key: "good_handling",
     title: "質の高い対応",
     emoji: "★",
-    bg: "from-blue-50 to-blue-100",
-    border: "border-blue-200",
-    text: "text-blue-900",
+    bg: "bg-brand-soft",
+    border: "border-brand-border",
+    text: "text-brand-green",
   },
   {
     key: "good_phrase",
     title: "印象的なフレーズ",
     emoji: "♪",
-    bg: "from-violet-50 to-violet-100",
-    border: "border-violet-200",
-    text: "text-violet-900",
+    bg: "bg-brand-soft",
+    border: "border-brand-border",
+    text: "text-brand-green",
   },
   {
     key: "positive_voc",
     title: "顧客の喜びの声",
     emoji: "♥",
-    bg: "from-rose-50 to-rose-100",
-    border: "border-rose-200",
-    text: "text-rose-900",
+    bg: "bg-brand-ssoft",
+    border: "border-brand-border",
+    text: "text-brand-sakura",
   },
   {
     key: "improvement_voc",
     title: "商品改善のヒント",
     emoji: "!",
-    bg: "from-amber-50 to-amber-100",
-    border: "border-amber-200",
-    text: "text-amber-900",
+    bg: "bg-brand-soft",
+    border: "border-brand-border",
+    text: "text-brand-green",
   },
 ];
 
@@ -82,11 +82,16 @@ export function DailyReportView({ report }: Props) {
   }).format(generatedAt);
 
   return (
-    <section className="bg-white border rounded-lg p-4 space-y-4">
+    <section className="bg-white border border-brand-border rounded-card p-5 shadow-soft space-y-4">
       <div className="flex items-baseline justify-between flex-wrap gap-2">
-        <h2 className="font-semibold">今日のレポート</h2>
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-brand-soft text-base">
+            📝
+          </span>
+          <h2 className="font-bold text-brand-green">今日のレポート</h2>
+        </div>
         <div className="flex items-center gap-3">
-          <span className="text-xs text-gray-400">
+          <span className="text-xs text-brand-sub">
             生成 {jstStr} / tokens {(report.tokens_in / 1000).toFixed(1)}k+
             {(report.tokens_out / 1000).toFixed(1)}k
           </span>
@@ -95,7 +100,7 @@ export function DailyReportView({ report }: Props) {
       </div>
 
       {report.overall_comment && (
-        <div className="bg-gray-50 border-l-4 border-gray-300 p-3 text-sm leading-relaxed">
+        <div className="bg-brand-bg border border-brand-border rounded-xl p-4 text-sm leading-relaxed text-brand-ink">
           {report.overall_comment}
         </div>
       )}
@@ -106,36 +111,36 @@ export function DailyReportView({ report }: Props) {
           return (
             <div
               key={cat.key}
-              className={`bg-gradient-to-br ${cat.bg} border ${cat.border} rounded-xl p-3`}
+              className={`${cat.bg} border ${cat.border} rounded-xl p-3`}
             >
               <div
-                className={`text-xs font-semibold ${cat.text} uppercase tracking-wider flex items-center gap-1`}
+                className={`text-xs font-bold ${cat.text} tracking-wider flex items-center gap-1`}
               >
                 <span>{cat.emoji}</span>
                 {cat.title}
                 <span className="ml-auto text-xs opacity-60">{list.length}件</span>
               </div>
               {list.length === 0 ? (
-                <p className="text-xs text-gray-400 mt-2">該当なし</p>
+                <p className="text-xs text-brand-sub mt-2">該当なし</p>
               ) : (
                 <ul className="space-y-2 mt-2">
                   {list.map((h, idx) => (
                     <li
                       key={`${cat.key}-${idx}-${h.session_id}`}
-                      className="bg-white/70 rounded p-2 text-xs"
+                      className="bg-white/70 rounded-lg p-2 text-xs"
                     >
                       <Link
                         href={`/recordings/${h.session_id}`}
-                        className={`font-semibold ${cat.text} hover:underline`}
+                        className={`font-bold ${cat.text} hover:underline`}
                       >
                         {h.title}
                       </Link>
                       <blockquote
-                        className={`mt-1 pl-2 border-l-2 ${cat.border} text-gray-700 italic`}
+                        className={`mt-1 pl-2 border-l-2 ${cat.border} text-brand-ink italic`}
                       >
                         「{h.quote}」
                       </blockquote>
-                      <p className="text-gray-500 mt-1">{h.comment}</p>
+                      <p className="text-brand-sub mt-1">{h.comment}</p>
                     </li>
                   ))}
                 </ul>
