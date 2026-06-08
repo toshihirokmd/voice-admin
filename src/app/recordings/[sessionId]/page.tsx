@@ -41,6 +41,27 @@ function formatDuration(sec: number | null): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+/**
+ * 1通話に提案登録が複数あっても、表としては1枚にまとめる。
+ * 各項目は「成功(1) > 提案のみ(0) > 未選択」の優先で1つの値に集約する。
+ * （例: ある登録で「提案のみ」、別の登録で「成功」なら → 成功 を採用）
+ */
+function mergeProposalItems(
+  proposals: Array<{ items: Record<string, unknown> }>
+): Record<string, "0" | "1" | null> {
+  const merged: Record<string, "0" | "1" | null> = {};
+  for (const proposal of proposals) {
+    for (const [key, raw] of Object.entries(proposal.items ?? {})) {
+      const v: "0" | "1" | null = raw === "1" ? "1" : raw === "0" ? "0" : null;
+      const cur = merged[key] ?? null;
+      if (v === "1") merged[key] = "1";
+      else if (v === "0" && cur !== "1") merged[key] = "0";
+      else if (!(key in merged)) merged[key] = null;
+    }
+  }
+  return merged;
+}
+
 export default async function RecordingDetailPage({
   params,
 }: {
@@ -57,11 +78,18 @@ export default async function RecordingDetailPage({
     .maybeSingle<RecordingDetail>();
 
   if (error) {
-    return <p className="text-red-600">エラー: {error.message}</p>;
+    return <p className="text-brand-sakura">エラー: {error.message}</p>;
   }
   if (!data) notFound();
 
   const t = data.transcripts?.[0];
+
+  // chromeos版は音声を {session_id}/chunk_*.pcm 形式で保存する（旧 mic_path/speaker_path
+  // は使わない）。meta.json の有無で音声ダウンロード可否を判定する。
+  const { data: audioFiles } = await supabase.storage
+    .from("voice-recordings")
+    .list(params.sessionId, { limit: 1, search: "meta.json" });
+  const hasAudio = (audioFiles ?? []).some((f) => f.name === "meta.json");
 
   const { data: proposalsData } = await supabase
     .from("proposals")
@@ -110,18 +138,22 @@ export default async function RecordingDetailPage({
   return (
     <article className="space-y-6">
       <div>
-        <Link href="/recordings" className="text-sm text-blue-600 hover:underline">
+        <Link href="/recordings" className="text-sm text-brand-green hover:underline">
           ← 一覧に戻る
         </Link>
-        <h1 className="text-2xl font-bold mt-2">{t?.title ?? "(タイトルなし)"}</h1>
+        <div className="text-xs font-bold text-brand-leaf tracking-widest mt-2">
+          RECORDING
+        </div>
+        <h1 className="text-3xl font-extrabold text-brand-green">{t?.title ?? "(タイトルなし)"}</h1>
+        <div className="mt-1 h-1 w-12 rounded-full bg-brand-sakura" />
         {(t?.products ?? []).length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1.5 items-center">
-            <span className="text-xs text-gray-500">言及された商品:</span>
+          <div className="mt-3 flex flex-wrap gap-1.5 items-center">
+            <span className="text-xs text-brand-sub">言及された商品:</span>
             {(t?.products ?? []).map((name) => (
               <Link
                 key={name}
                 href={`/recordings?${new URLSearchParams({ product: name, product_match: "or" }).toString()}`}
-                className="text-xs px-2 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-300 hover:bg-blue-200"
+                className="text-xs px-2 py-0.5 rounded-full font-bold bg-brand-soft text-brand-green hover:bg-brand-leaf/25"
               >
                 {name}
               </Link>
@@ -130,7 +162,14 @@ export default async function RecordingDetailPage({
         )}
       </div>
 
-      <section className="bg-white rounded shadow p-4 grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+      <section className="bg-white border border-brand-border rounded-card p-5 shadow-soft">
+        <div className="flex items-center gap-2 mb-4">
+          <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-brand-soft text-base">
+            📄
+          </span>
+          <h2 className="font-bold text-brand-green">録音情報</h2>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
         <Field label="録音日時" value={formatDateTime(data.started_at)} />
         <Field label="録音時間" value={formatDuration(data.duration_sec)} />
         <Field label="ステータス" value={data.status} />
@@ -140,31 +179,37 @@ export default async function RecordingDetailPage({
         <Field label="セッションID" value={data.session_id} mono />
         <Field label="トークン入" value={t?.tokens_in?.toString() ?? "-"} />
         <Field label="トークン出" value={t?.tokens_out?.toString() ?? "-"} />
+        </div>
       </section>
 
-      <section className="bg-white rounded shadow p-4">
-        <h2 className="font-semibold mb-2">音声ダウンロード</h2>
+      <section className="bg-white border border-brand-border rounded-card p-5 shadow-soft">
+        <div className="flex items-center gap-2 mb-4">
+          <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-brand-soft text-base">
+            🎧
+          </span>
+          <h2 className="font-bold text-brand-green">音声ダウンロード</h2>
+        </div>
         <div className="flex flex-wrap gap-3 items-center">
-          {data.mic_path && data.speaker_path ? (
+          {hasAudio ? (
             <>
               <a
                 href={`/api/download/${data.session_id}?track=mixed`}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold"
+                className="px-6 py-2.5 bg-brand-green text-white rounded-xl hover:bg-brand-dark font-bold transition"
               >
                 通話音声をダウンロード（統合）
               </a>
-              <details className="text-sm text-gray-500">
-                <summary className="cursor-pointer hover:text-gray-700">個別トラックも必要な場合</summary>
+              <details className="text-sm text-brand-sub">
+                <summary className="cursor-pointer hover:text-brand-green">個別トラックも必要な場合</summary>
                 <div className="mt-2 flex gap-2">
                   <a
                     href={`/api/download/${data.session_id}?track=mic`}
-                    className="px-3 py-1.5 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 text-xs"
+                    className="px-4 py-2 bg-white border border-brand-border text-brand-sub rounded-lg hover:bg-brand-soft text-xs"
                   >
                     オペレーター音声のみ
                   </a>
                   <a
                     href={`/api/download/${data.session_id}?track=speaker`}
-                    className="px-3 py-1.5 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 text-xs"
+                    className="px-4 py-2 bg-white border border-brand-border text-brand-sub rounded-lg hover:bg-brand-soft text-xs"
                   >
                     お客様音声のみ
                   </a>
@@ -172,46 +217,73 @@ export default async function RecordingDetailPage({
               </details>
             </>
           ) : (
-            <p className="text-sm text-gray-500">音声ファイルはまだ保存されていません。</p>
+            <p className="text-sm text-brand-sub">音声ファイルはまだ保存されていません。</p>
           )}
         </div>
       </section>
 
-      <section className="bg-white rounded shadow p-4">
-        <h2 className="font-semibold mb-2">要約</h2>
-        <pre className="whitespace-pre-wrap text-sm">{t?.summary ?? "-"}</pre>
+      <section className="bg-white border border-brand-border rounded-card p-5 shadow-soft">
+        <div className="flex items-center gap-2 mb-4">
+          <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-brand-soft text-base">
+            📝
+          </span>
+          <h2 className="font-bold text-brand-green">要約</h2>
+        </div>
+        <pre className="whitespace-pre-wrap text-sm text-brand-ink">{t?.summary ?? "-"}</pre>
       </section>
 
-      <section className="bg-white rounded shadow p-4">
-        <h2 className="font-semibold mb-2">タグ</h2>
+      <section className="bg-white border border-brand-border rounded-card p-5 shadow-soft">
+        <div className="flex items-center gap-2 mb-4">
+          <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-brand-soft text-base">
+            🏷️
+          </span>
+          <h2 className="font-bold text-brand-green">タグ</h2>
+        </div>
         <div className="flex flex-wrap gap-2">
           {(t?.tags ?? []).map((tag) => (
-            <span key={tag} className="px-2 py-0.5 text-xs bg-gray-200 rounded">
+            <span key={tag} className="px-2 py-0.5 text-xs rounded-full bg-brand-soft text-brand-green font-bold">
               {tag}
             </span>
           ))}
-          {(!t?.tags || t.tags.length === 0) && <span className="text-sm text-gray-500">-</span>}
+          {(!t?.tags || t.tags.length === 0) && <span className="text-sm text-brand-sub">-</span>}
         </div>
       </section>
 
-      <section className="bg-white rounded shadow p-4">
-        <h2 className="font-semibold mb-2">提案結果</h2>
+      <section className="bg-white border border-brand-border rounded-card p-5 shadow-soft">
+        <div className="flex items-center gap-2 mb-4">
+          <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-brand-soft text-base">
+            🎯
+          </span>
+          <h2 className="font-bold text-brand-green">提案結果</h2>
+        </div>
         {proposals.length === 0 ? (
-          <p className="text-sm text-gray-500">この録音にひもづく提案結果はまだありません。</p>
+          <p className="text-sm text-brand-sub">この録音にひもづく提案結果はまだありません。</p>
         ) : (
-          <div className="space-y-4">
-            {proposals.map((proposal) => (
-              <div key={proposal.id} className="border rounded p-3">
-                <div className="text-xs text-gray-500 mb-2">
-                  {new Date(proposal.proposed_at).toLocaleString("ja-JP", { hour12: false, timeZone: "Asia/Tokyo" })}
-                </div>
+          (() => {
+            const mergedItems = mergeProposalItems(proposals);
+            return (
+              <div className="border border-brand-border rounded-lg p-3">
+                {proposals.length > 1 && (
+                  <div className="text-xs text-brand-sub mb-2">
+                    提案登録 {proposals.length} 件をまとめて表示（
+                    {proposals
+                      .map((p) =>
+                        new Date(p.proposed_at).toLocaleString("ja-JP", {
+                          hour12: false,
+                          timeZone: "Asia/Tokyo",
+                        })
+                      )
+                      .join(" / ")}
+                    ）
+                  </div>
+                )}
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
                   {PROPOSAL_ITEMS.map((item) => {
-                    const v = valueLabel(proposal.items[item.key]);
+                    const v = valueLabel(mergedItems[item.key]);
                     return (
                       <div
                         key={item.key}
-                        className={`flex items-center justify-between border rounded px-2 py-1 text-xs ${v.cls}`}
+                        className={`flex items-center justify-between border border-brand-border rounded-lg px-2 py-1 text-xs ${v.cls}`}
                       >
                         <span className="truncate">{item.label}</span>
                         <span className="font-semibold ml-2">{v.text}</span>
@@ -220,15 +292,20 @@ export default async function RecordingDetailPage({
                   })}
                 </div>
               </div>
-            ))}
-          </div>
+            );
+          })()
         )}
       </section>
 
-      <section className="bg-white rounded shadow p-4">
-        <h2 className="font-semibold mb-2">紐付け受注</h2>
+      <section className="bg-white border border-brand-border rounded-card p-5 shadow-soft">
+        <div className="flex items-center gap-2 mb-4">
+          <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-brand-soft text-base">
+            📦
+          </span>
+          <h2 className="font-bold text-brand-green">紐付け受注</h2>
+        </div>
         {linkedOrders.length === 0 ? (
-          <p className="text-sm text-gray-500">この録音にひもづく受注はまだ登録されていません。</p>
+          <p className="text-sm text-brand-sub">この録音にひもづく受注はまだ登録されていません。</p>
         ) : (
           <div className="space-y-3">
             {linkedOrders.map((order) => {
@@ -239,28 +316,28 @@ export default async function RecordingDetailPage({
               if (order.payment_method) meta.push(order.payment_method);
               if (order.recipient_name) meta.push(order.recipient_name);
               return (
-                <div key={order.id} className="border rounded p-3">
+                <div key={order.id} className="border border-brand-border rounded-lg p-3">
                   <div className="flex flex-wrap items-baseline gap-2">
-                    <span className="font-semibold text-sm">
+                    <span className="font-bold text-sm text-brand-ink">
                       {order.order_number ? `受注 ${order.order_number}` : "受注 (番号不明)"}
                     </span>
                     {(order.status_code !== null || order.status_label) && (
-                      <span className="text-xs text-gray-600">
+                      <span className="text-xs text-brand-sub">
                         {order.status_code !== null ? `${order.status_code}: ` : ""}
                         {order.status_label ?? ""}
                       </span>
                     )}
-                    <span className="ml-auto text-xs text-gray-400">
+                    <span className="ml-auto text-xs text-brand-sub">
                       登録 {formatDateTime(order.selected_at)}
                     </span>
                   </div>
                   {groups.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1.5 items-center">
-                      <span className="text-xs text-gray-500">商品グループ:</span>
+                      <span className="text-xs text-brand-sub">商品グループ:</span>
                       {groups.map((g) => (
                         <span
                           key={g}
-                          className={`text-xs px-2 py-0.5 rounded border ${g === "未分類" ? "bg-gray-100 text-gray-600 border-gray-300" : "bg-emerald-100 text-emerald-800 border-emerald-300"}`}
+                          className={`text-xs px-2 py-0.5 rounded-full font-bold ${g === "未分類" ? "bg-brand-soft text-brand-sub" : "bg-brand-soft text-brand-green"}`}
                         >
                           {g}
                         </span>
@@ -268,14 +345,14 @@ export default async function RecordingDetailPage({
                     </div>
                   )}
                   {names.length > 0 && (
-                    <div className="mt-1 text-xs text-gray-500">
+                    <div className="mt-1 text-xs text-brand-sub">
                       商品: {names.join(" / ")}
                     </div>
                   )}
                   {meta.length > 0 && (
-                    <div className="mt-1 text-xs text-gray-500">{meta.join(" / ")}</div>
+                    <div className="mt-1 text-xs text-brand-sub">{meta.join(" / ")}</div>
                   )}
-                  <div className="mt-1 text-xs text-gray-500">
+                  <div className="mt-1 text-xs text-brand-sub">
                     {order.shipping_date && <span>出荷予定 {order.shipping_date} / </span>}
                     {order.delivery_date && <span>配達 {order.delivery_date} / </span>}
                     {order.next_delivery_date && <span>次回 {order.next_delivery_date}</span>}
@@ -287,9 +364,14 @@ export default async function RecordingDetailPage({
         )}
       </section>
 
-      <section className="bg-white rounded shadow p-4">
-        <h2 className="font-semibold mb-2">本文（書き起こし）</h2>
-        <pre className="whitespace-pre-wrap text-sm">{t?.merged_text ?? "-"}</pre>
+      <section className="bg-white border border-brand-border rounded-card p-5 shadow-soft">
+        <div className="flex items-center gap-2 mb-4">
+          <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-brand-soft text-base">
+            💬
+          </span>
+          <h2 className="font-bold text-brand-green">本文（書き起こし）</h2>
+        </div>
+        <pre className="whitespace-pre-wrap text-sm text-brand-ink">{t?.merged_text ?? "-"}</pre>
       </section>
     </article>
   );
@@ -298,8 +380,8 @@ export default async function RecordingDetailPage({
 function Field({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div>
-      <div className="text-xs text-gray-500">{label}</div>
-      <div className={mono ? "font-mono text-xs break-all" : ""}>{value}</div>
+      <div className="text-xs text-brand-sub">{label}</div>
+      <div className={mono ? "font-mono text-xs break-all text-brand-ink" : "text-brand-ink"}>{value}</div>
     </div>
   );
 }

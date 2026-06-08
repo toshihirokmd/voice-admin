@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
-import { mixMonoWavs } from "@/lib/audio/mix";
+import { buildStereoWav, concatChunks, extractChannelWav } from "@/lib/audio/chunks";
 
 const BUCKET = "voice-recordings";
-const SIGNED_URL_TTL_SEC = 60 * 60;
 
 export async function GET(
   request: Request,
@@ -19,7 +18,7 @@ export async function GET(
   const supabase = createClient();
   const { data: recording, error } = await supabase
     .from("recordings")
-    .select("mic_path,speaker_path")
+    .select("session_id")
     .eq("session_id", params.sessionId)
     .maybeSingle();
 
@@ -27,50 +26,54 @@ export async function GET(
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
 
-  if (track === "mixed") {
-    if (!recording.mic_path || !recording.speaker_path) {
+  // chromeos版は {session_id}/meta.json + chunk_*.pcm (ステレオ生PCM) で保存される。
+  // meta から chunk 数とレートを得て結合し、要求トラックの WAV を組み立てて返す。
+  try {
+    const metaRaw = await downloadFromStorage(supabase, `${params.sessionId}/meta.json`);
+    const meta = JSON.parse(Buffer.from(metaRaw).toString("utf-8")) as {
+      total_chunks?: number;
+      sample_rate?: number;
+    };
+    const totalChunks = Number(meta.total_chunks);
+    const sampleRate = Number(meta.sample_rate);
+    if (!totalChunks || !sampleRate) {
       return NextResponse.json({ error: "audio_unavailable" }, { status: 404 });
     }
-    try {
-      const [micBuf, spkBuf] = await Promise.all([
-        downloadFromStorage(supabase, recording.mic_path),
-        downloadFromStorage(supabase, recording.speaker_path),
-      ]);
-      const mixed = mixMonoWavs(micBuf, spkBuf);
-      const filename = `${params.sessionId}.wav`;
-      const ab = mixed.buffer.slice(mixed.byteOffset, mixed.byteOffset + mixed.byteLength) as ArrayBuffer;
-      return new NextResponse(ab, {
-        status: 200,
-        headers: {
-          "Content-Type": "audio/wav",
-          "Content-Length": ab.byteLength.toString(),
-          "Content-Disposition": `attachment; filename="${filename}"`,
-          "Cache-Control": "private, max-age=0",
-        },
-      });
-    } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : "mix_failed";
-      return NextResponse.json({ error: "mix_failed", detail: message }, { status: 500 });
-    }
-  }
 
-  // Single-track fallback: redirect to a signed URL (cheaper than streaming through us).
-  const path = track === "speaker" ? recording.speaker_path : recording.mic_path;
-  if (!path) {
+    const paths = Array.from(
+      { length: totalChunks },
+      (_, i) => `${params.sessionId}/chunk_${String(i).padStart(5, "0")}.pcm`
+    );
+    const buffers = await Promise.all(paths.map((p) => downloadFromStorage(supabase, p)));
+    const pcm = concatChunks(buffers);
+
+    let wav: Buffer;
+    let suffix: string;
+    if (track === "mic") {
+      wav = extractChannelWav(pcm, 0, sampleRate); // L = オペレーター
+      suffix = "mic";
+    } else if (track === "speaker") {
+      wav = extractChannelWav(pcm, 1, sampleRate); // R = お客様
+      suffix = "speaker";
+    } else {
+      wav = buildStereoWav(pcm, sampleRate); // L/R 両方（話者が左右に分かれて聞きやすい）
+      suffix = "mixed";
+    }
+
+    const ab = wav.buffer.slice(wav.byteOffset, wav.byteOffset + wav.byteLength) as ArrayBuffer;
+    return new NextResponse(ab, {
+      status: 200,
+      headers: {
+        "Content-Type": "audio/wav",
+        "Content-Length": ab.byteLength.toString(),
+        "Content-Disposition": `attachment; filename="${params.sessionId}-${suffix}.wav"`,
+        "Cache-Control": "private, max-age=0",
+      },
+    });
+  } catch {
+    // chunk が無い（未保存 / 90日経過で削除済み）等
     return NextResponse.json({ error: "audio_unavailable" }, { status: 404 });
   }
-  const { data: signed, error: signErr } = await supabase.storage
-    .from(BUCKET)
-    .createSignedUrl(path, SIGNED_URL_TTL_SEC, {
-      download: `${params.sessionId}-${track}.wav`,
-    });
-  if (signErr || !signed?.signedUrl) {
-    return NextResponse.json(
-      { error: "sign_failed", detail: signErr?.message },
-      { status: 500 }
-    );
-  }
-  return NextResponse.redirect(signed.signedUrl);
 }
 
 async function downloadFromStorage(
