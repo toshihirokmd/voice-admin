@@ -4,6 +4,37 @@ import { jstYmdToIso } from "@/lib/dashboard/date";
 
 const MODEL = "gemini-2.5-flash";
 
+/**
+ * Gemini クライアントを生成する。
+ * 優先: Vertex AI（サービスアカウント認証）。GOOGLE_SERVICE_ACCOUNT_JSON が
+ * 設定されていれば Vertex を使う。これは AI Studio の API キー
+ * (generativelanguage) と違い「キー停止(CONSUMER_SUSPENDED)」の影響を受けない。
+ * フォールバック: GEMINI_API_KEY（旧方式・キーが生きている場合のみ）。
+ */
+function buildGenAIClient(): GoogleGenAI {
+  const saJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+  if (saJson) {
+    const credentials = JSON.parse(saJson) as {
+      client_email: string;
+      private_key: string;
+    };
+    return new GoogleGenAI({
+      vertexai: true,
+      project:
+        process.env.GOOGLE_VERTEX_PROJECT ?? "gen-lang-client-0743741310",
+      location: process.env.GOOGLE_VERTEX_LOCATION ?? "asia-northeast1",
+      googleAuthOptions: { credentials },
+    });
+  }
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      "GOOGLE_SERVICE_ACCOUNT_JSON も GEMINI_API_KEY も設定されていません"
+    );
+  }
+  return new GoogleGenAI({ apiKey });
+}
+
 export interface HighlightEntry {
   session_id: string;
   title: string;
@@ -48,11 +79,6 @@ export async function generateDailyReport(
   operatorEmail: string,
   reportDateYmd: string
 ): Promise<GeneratedReport | null> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY が設定されていません");
-  }
-
   const transcripts = await fetchTranscriptsForDay(
     supabase,
     operatorEmail,
@@ -60,7 +86,7 @@ export async function generateDailyReport(
   );
   if (transcripts.length === 0) return null;
 
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = buildGenAIClient();
   const prompt = buildPrompt(transcripts);
 
   const response = await ai.models.generateContent({
