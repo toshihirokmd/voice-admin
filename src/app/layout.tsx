@@ -64,6 +64,10 @@ export default async function RootLayout({
                         <IconMic className="text-brand-leaf" />
                         録音一覧
                       </Link>
+                      <Link href="/uploads" className={navLinkCls}>
+                        <IconMic className="text-brand-leaf" />
+                        アップロード
+                      </Link>
                       <Link href="/prompt" className={navLinkCls}>
                         <IconPrompt className="text-brand-leaf" />
                         プロンプト
