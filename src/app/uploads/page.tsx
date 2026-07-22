@@ -11,9 +11,10 @@ const STATUS: Record<string, { label: string; cls: string }> = {
   failed: { label: "失敗", cls: "bg-brand-ssoft text-brand-sakura" },
 };
 
+// 通話日は「日付」の情報なので時刻は出さない（時刻を出すと 0:00/9:00 が並んで紛らわしい）。
 function fmt(iso: string | null): string {
   if (!iso) return "-";
-  return new Date(iso).toLocaleString("ja-JP", { hour12: false, timeZone: "Asia/Tokyo" });
+  return new Date(iso).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" });
 }
 
 type Row = {

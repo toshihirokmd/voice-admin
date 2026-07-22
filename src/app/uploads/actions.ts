@@ -84,7 +84,10 @@ export async function startUpload(
     .upload(path, buf, { contentType: mime, upsert: false });
   if (up.error) return { ok: false, error: `保存に失敗しました: ${up.error.message}` };
 
-  const startedAtDate = callDateRaw ? new Date(callDateRaw) : new Date();
+  // input[type=date] は "2026-07-22" 形式。new Date("2026-07-22") は UTC 0時と
+  // 解釈されるため、日本時間で表示すると必ず 9:00 になってしまう（通話日が全部9時問題）。
+  // 明示的に JST の 0 時として解釈する。日付未入力時はアップロード時刻をそのまま使う。
+  const startedAtDate = callDateRaw ? new Date(`${callDateRaw}T00:00:00+09:00`) : new Date();
   const startedAt = (Number.isNaN(startedAtDate.getTime()) ? new Date() : startedAtDate).toISOString();
   const ins = await svc
     .from("recordings")

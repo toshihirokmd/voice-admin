@@ -6,9 +6,10 @@ import { CopyButton } from "../copy-button";
 
 export const dynamic = "force-dynamic";
 
+// 通話日は「日付」の情報なので時刻は出さない（一覧と表示を揃える）。
 function fmt(iso: string | null): string {
   if (!iso) return "-";
-  return new Date(iso).toLocaleString("ja-JP", { hour12: false, timeZone: "Asia/Tokyo" });
+  return new Date(iso).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" });
 }
 
 const STATUS_LABEL: Record<string, string> = {
