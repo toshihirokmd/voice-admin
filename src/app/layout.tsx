@@ -58,15 +58,16 @@ export default async function RootLayout({
                     <IconMe className="text-brand-leaf" />
                     マイページ
                   </Link>
+                  {/* アップロード書き起こしは admin/operator 問わず全員が使える */}
+                  <Link href="/uploads" className={navLinkCls}>
+                    <IconMic className="text-brand-leaf" />
+                    アップロード
+                  </Link>
                   {user.role === "admin" && (
                     <>
                       <Link href="/recordings" className={navLinkCls}>
                         <IconMic className="text-brand-leaf" />
                         録音一覧
-                      </Link>
-                      <Link href="/uploads" className={navLinkCls}>
-                        <IconMic className="text-brand-leaf" />
-                        アップロード
                       </Link>
                       <Link href="/prompt" className={navLinkCls}>
                         <IconPrompt className="text-brand-leaf" />

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdmin } from "@/lib/supabase/auth";
+import { requireUser } from "@/lib/supabase/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requestUploadTranscription } from "@/lib/finalize";
 
@@ -63,7 +63,7 @@ export async function startUpload(
   _prev: unknown,
   formData: FormData,
 ): Promise<ActionResult> {
-  const user = await requireAdmin();
+  const user = await requireUser();
   const file = formData.get("audio") as File | null;
   const callDateRaw = ((formData.get("call_date") as string) || "").trim();
   const note = ((formData.get("note") as string) || "").trim();
@@ -120,7 +120,7 @@ export async function retryUpload(
   _prev: unknown,
   formData: FormData,
 ): Promise<ActionResult> {
-  await requireAdmin();
+  await requireUser();
   const recordingId = (formData.get("recording_id") as string) || "";
   if (!recordingId) return { ok: false, error: "対象がありません" };
 
