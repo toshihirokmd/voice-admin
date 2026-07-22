@@ -144,3 +144,56 @@ export function proposalSuccessMap(
   }
   return m;
 }
+
+export interface MyCall {
+  id: string;
+  sessionId: string;
+  startedAt: string | null;
+  durationSec: number | null;
+  status: string;
+  title: string | null;
+  summary: string | null;
+  mergedText: string | null;
+}
+
+/**
+ * ログイン中オペレーター自身の通話を新しい順に取得する。
+ * 自分の対応を振り返る用途なので operator_email で必ず絞る（他人の通話は返さない）。
+ * 拡張で録った通常の通話のみ（アップロード分は /uploads で見る）。
+ */
+export async function fetchMyCalls(
+  supabase: SupabaseClient,
+  email: string,
+  limit = 50
+): Promise<MyCall[]> {
+  const { data } = await supabase
+    .from("recordings")
+    .select("id, session_id, started_at, duration_sec, status, source, transcripts(title, summary, merged_text)")
+    .eq("operator_email", email)
+    .neq("source", "upload")
+    .order("started_at", { ascending: false })
+    .limit(limit);
+
+  type Row = {
+    id: string;
+    session_id: string;
+    started_at: string | null;
+    duration_sec: number | null;
+    status: string;
+    transcripts: { title: string | null; summary: string | null; merged_text: string | null }[] | null;
+  };
+
+  return ((data ?? []) as Row[]).map((r) => {
+    const t = r.transcripts?.[0];
+    return {
+      id: r.id,
+      sessionId: r.session_id,
+      startedAt: r.started_at,
+      durationSec: r.duration_sec,
+      status: r.status,
+      title: t?.title ?? null,
+      summary: t?.summary ?? null,
+      mergedText: t?.merged_text ?? null,
+    };
+  });
+}

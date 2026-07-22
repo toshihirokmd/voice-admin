@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/supabase/auth";
+import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { buildStereoWav, concatChunks, extractChannelWav } from "@/lib/audio/chunks";
 
@@ -9,7 +9,9 @@ export async function GET(
   request: Request,
   { params }: { params: { sessionId: string } }
 ) {
-  await requireAdmin();
+  // オペレーターにも開放するが、落とせるのは「自分が対応した通話」だけに限る。
+  // admin は従来どおり全件（監督・品質確認のため）。
+  const user = await requireUser();
 
   const url = new URL(request.url);
   const trackParam = url.searchParams.get("track") ?? "mixed";
@@ -18,12 +20,19 @@ export async function GET(
   const supabase = createClient();
   const { data: recording, error } = await supabase
     .from("recordings")
-    .select("session_id")
+    .select("session_id, operator_email")
     .eq("session_id", params.sessionId)
     .maybeSingle();
 
   if (error || !recording) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
+  }
+
+  // 他人の通話音声（顧客の声を含む）を session_id 直打ちで取得されないよう所有者を検証する。
+  const isOwner =
+    (recording.operator_email ?? "").toLowerCase() === user.email.toLowerCase();
+  if (user.role !== "admin" && !isOwner) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
   // chromeos版は {session_id}/meta.json + chunk_*.pcm (ステレオ生PCM) で保存される。

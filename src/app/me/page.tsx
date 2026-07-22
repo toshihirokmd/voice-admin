@@ -6,9 +6,11 @@ import {
 } from "@/lib/dashboard/queries";
 import {
   fetchMeData,
+  fetchMyCalls,
   proposalSuccessMap,
   calcOverallProposalRate,
 } from "@/lib/me/queries";
+import { MyCalls } from "./my-calls";
 import { jstTodayYmd, resolvePeriodRange } from "@/lib/dashboard/date";
 import { PROPOSAL_ITEMS } from "@/lib/proposal/items";
 import { callTypeLabel, callTypeBadgeClass } from "@/lib/call-type";
@@ -32,7 +34,7 @@ export default async function MyPage() {
 
   const range = resolvePeriodRange("this_month");
   const todayYmd = jstTodayYmd();
-  const [meDataResult, todayReportRow] = await Promise.all([
+  const [meDataResult, todayReportRow, myCalls] = await Promise.all([
     fetchMeData(supabase, user.email, range),
     supabase
       .from("daily_reports")
@@ -40,6 +42,8 @@ export default async function MyPage() {
       .eq("operator_email", user.email)
       .eq("report_date", todayYmd)
       .maybeSingle(),
+    // 自分の通話（振り返り用）。他人の通話は取得しない。
+    fetchMyCalls(supabase, user.email, 50),
   ]);
   const { me, prev, global, prevRange } = meDataResult;
   const todayReport = (todayReportRow.data as DailyReport | null) ?? null;
@@ -403,6 +407,14 @@ export default async function MyPage() {
           )}
         </section>
       </div>
+
+      <section className="mt-8">
+        <h2 className="font-bold text-brand-green">自分の通話を振り返る</h2>
+        <p className="mt-1 mb-3 text-xs text-brand-sub">
+          直近50件です。「書き起こしを見る」で要約・全文を確認、「音声DL」で自分の通話の音声を保存できます（自分の通話のみ）。
+        </p>
+        <MyCalls calls={myCalls} />
+      </section>
 
       <div className="text-center mt-6">
         <Link
