@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/supabase/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { RetryButton } from "../retry-button";
 import { CopyButton } from "../copy-button";
+import { AutoRefresh } from "../auto-refresh";
 
 export const dynamic = "force-dynamic";
 
@@ -89,9 +90,10 @@ export default async function UploadDetailPage({ params }: { params: { id: strin
 
       {rec.status === "processing" && (
         <div className="bg-brand-soft border border-brand-border rounded-card p-4 text-sm text-brand-sub">
-          処理中です。少し待ってから再読み込みしてください。
+          処理中です。完了すると自動で表示が更新されます（長い音声は数分かかります）。
         </div>
       )}
+      <AutoRefresh active={rec.status === "processing"} />
       {rec.status === "failed" && (
         <div className="bg-brand-ssoft border border-brand-border rounded-card p-4 space-y-2">
           <p className="text-sm font-bold text-brand-sakura">書き起こしに失敗しました。</p>

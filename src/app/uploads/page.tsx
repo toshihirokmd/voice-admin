@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireUser } from "@/lib/supabase/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { UploadForm } from "./upload-form";
+import { AutoRefresh } from "./auto-refresh";
 
 export const dynamic = "force-dynamic";
 
@@ -37,9 +38,11 @@ export default async function UploadsPage() {
     .order("started_at", { ascending: false })
     .limit(100);
   const rows = (data ?? []) as Row[];
+  const hasProcessing = rows.some((r) => r.status === "processing");
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-8 space-y-6">
+      <AutoRefresh active={hasProcessing} />
       <header>
         <p className="text-xs font-bold text-brand-leaf tracking-widest">UPLOAD</p>
         <h1 className="text-3xl font-extrabold text-brand-green">アップロード書き起こし</h1>
