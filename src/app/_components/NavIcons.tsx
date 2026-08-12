@@ -64,6 +64,16 @@ export function IconProduct({ className }: IconProps) {
   );
 }
 
+export function IconGauge({ className }: IconProps) {
+  return (
+    <svg {...baseProps} className={className} aria-hidden>
+      <path d="M4.93 19.07A10 10 0 1 1 19.07 19.07" />
+      <line x1="12" y1="12" x2="15.5" y2="8.5" />
+      <line x1="12" y1="19" x2="12" y2="19.01" />
+    </svg>
+  );
+}
+
 export function IconUsers({ className }: IconProps) {
   return (
     <svg {...baseProps} className={className} aria-hidden>

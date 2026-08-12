@@ -12,6 +12,7 @@ const notoSansJP = Noto_Sans_JP({
 import { getCurrentUser } from "@/lib/supabase/auth";
 import {
   IconDashboard,
+  IconGauge,
   IconMe,
   IconMic,
   IconPrompt,
@@ -62,6 +63,11 @@ export default async function RootLayout({
                   <Link href="/uploads" className={navLinkCls}>
                     <IconMic className="text-brand-leaf" />
                     アップロード
+                  </Link>
+                  {/* 評価ポイントの説明ページは全員が見られる（評価結果自体はadmin限定） */}
+                  <Link href="/hyoka-points" className={navLinkCls}>
+                    <IconGauge className="text-brand-leaf" />
+                    評価ポイント
                   </Link>
                   {user.role === "admin" && (
                     <>
