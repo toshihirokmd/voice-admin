@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { PROPOSAL_ITEMS, valueLabel } from "@/lib/proposal/items";
+import { renderEvaluation, type Evaluation } from "@/lib/evaluation";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,7 @@ type RecordingDetail = {
     products: string[] | null;
     tokens_in: number | null;
     tokens_out: number | null;
+    evaluation: Evaluation | null;
   }>;
 };
 
@@ -67,12 +69,12 @@ export default async function RecordingDetailPage({
 }: {
   params: { sessionId: string };
 }) {
-  await requireAdmin();
+  const user = await requireAdmin();
   const supabase = createClient();
   const { data, error } = await supabase
     .from("recordings")
     .select(
-      "id,session_id,started_at,ended_at,duration_sec,operator_email,status,customer_id,source_url,mic_path,speaker_path,transcripts(title,summary,merged_text,tags,products,tokens_in,tokens_out)"
+      "id,session_id,started_at,ended_at,duration_sec,operator_email,status,customer_id,source_url,mic_path,speaker_path,transcripts(title,summary,merged_text,tags,products,tokens_in,tokens_out,evaluation)"
     )
     .eq("session_id", params.sessionId)
     .maybeSingle<RecordingDetail>();
@@ -231,6 +233,17 @@ export default async function RecordingDetailPage({
         </div>
         <pre className="whitespace-pre-wrap text-sm text-brand-ink">{t?.summary ?? "-"}</pre>
       </section>
+
+      {user.role === "admin" && t?.evaluation && (
+        <section className="bg-white border border-brand-border rounded-card shadow-soft p-5 space-y-2">
+          <h2 className="text-sm font-bold text-brand-green">■ 応対の振り返り（管理者のみ）</h2>
+          {renderEvaluation(t.evaluation).map((r) => (
+            <p key={r.axis} className="text-sm text-brand-ink">
+              ・{r.axis}：<b>{r.label}</b> ／ 根拠「{r.note}」
+            </p>
+          ))}
+        </section>
+      )}
 
       <section className="bg-white border border-brand-border rounded-card p-5 shadow-soft">
         <div className="flex items-center gap-2 mb-4">
