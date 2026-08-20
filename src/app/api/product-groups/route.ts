@@ -35,44 +35,50 @@ type ProductGroupItem = {
 export async function GET(): Promise<NextResponse> {
   const sheetId = process.env.PRODUCT_GROUPS_SHEET_ID ?? DEFAULT_SHEET_ID;
   const sheetName = process.env.PRODUCT_GROUPS_SHEET_NAME ?? DEFAULT_SHEET_NAME;
-  // gviz endpoint takes a sheet *name* directly, which is more durable than
-  // a numeric gid — the SKU↔group sheet has a stable "data" tab next to the
-  // SQL helper sheet, and we only ever want the data tab.
-  const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
+  // The "group" tab holds the canonical list of valid product groups (col A =
+  // index, col B = group name). The extension needs it to classify order names
+  // that don't exactly match the SQL-generated "data" tab (campaign-decorated
+  // SKU names). Tab name is overridable but defaults to "group".
+  const groupTabName = process.env.PRODUCT_GROUPS_GROUP_SHEET_NAME ?? "group";
 
-  let csvText: string;
-  try {
-    const upstream = await fetch(csvUrl, {
-      // Next.js will obey revalidate for fetch-level caching too.
+  const csvUrl = (name: string) =>
+    `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(name)}`;
+
+  async function fetchTab(name: string): Promise<string> {
+    const upstream = await fetch(csvUrl(name), {
       next: { revalidate },
-      // Google sometimes 302-redirects through a login page when the sheet
-      // isn't shared widely — manual redirect lets us spot that case.
       redirect: "follow",
       headers: { Accept: "text/csv" },
     });
     if (!upstream.ok) {
-      return errorJson(
-        `Sheet fetch failed: ${upstream.status} ${upstream.statusText}`,
-        502
-      );
+      throw new Error(`Sheet fetch failed: ${upstream.status} ${upstream.statusText}`);
     }
     const contentType = upstream.headers.get("content-type") ?? "";
     if (contentType.includes("text/html")) {
-      // Google returns an HTML login page when the sheet isn't readable.
-      return errorJson(
-        "Sheet is not publicly readable. Share with 'Anyone with the link → viewer' or wire a service account.",
-        502
+      throw new Error(
+        "Sheet is not publicly readable. Share with 'Anyone with the link → viewer' or wire a service account."
       );
     }
-    csvText = await upstream.text();
+    return upstream.text();
+  }
+
+  let csvText: string;
+  let groupCsv = "";
+  try {
+    csvText = await fetchTab(sheetName);
   } catch (err) {
-    return errorJson(
-      `Sheet fetch raised: ${err instanceof Error ? err.message : String(err)}`,
-      502
-    );
+    return errorJson(err instanceof Error ? err.message : String(err), 502);
+  }
+  try {
+    // The group tab is a nice-to-have fallback vocabulary; if it fails we still
+    // return items so exact-match classification keeps working.
+    groupCsv = await fetchTab(groupTabName);
+  } catch {
+    groupCsv = "";
   }
 
   const items = parseCsv(csvText);
+  const groups = parseGroupTab(groupCsv);
   return cors(
     NextResponse.json({
       updated_at: new Date().toISOString(),
@@ -80,8 +86,31 @@ export async function GET(): Promise<NextResponse> {
       sheet_name: sheetName,
       count: items.length,
       items,
+      groups,
     })
   );
+}
+
+/**
+ * Parse the "group" tab: two columns (index, group_name). We only need the
+ * distinct group names (col B). Skips a header row if present and blanks.
+ */
+function parseGroupTab(text: string): string[] {
+  if (!text) return [];
+  const rows = splitCsvRows(text);
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const cells of rows) {
+    // group name is the last non-empty cell on the row (col B in practice).
+    const name = (cells[1] ?? cells[0] ?? "").trim();
+    if (!name) continue;
+    // Skip an obvious header ("product_group", "group", numeric-only index rows).
+    if (/^product[_ ]?group$/i.test(name) || name === "group") continue;
+    if (seen.has(name)) continue;
+    seen.add(name);
+    out.push(name);
+  }
+  return out;
 }
 
 export function OPTIONS(): NextResponse {
