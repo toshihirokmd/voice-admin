@@ -6,6 +6,7 @@ export type Evaluation = {
   relationship_note: string;
   value_delivery: number;
   value_note: string;
+  good_point?: string; // v2: 一番良かった点（褒めの主役）
 };
 
 const LBL = {

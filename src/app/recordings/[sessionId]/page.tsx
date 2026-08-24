@@ -237,6 +237,11 @@ export default async function RecordingDetailPage({
       {user.role === "admin" && t?.evaluation && (
         <section className="bg-white border border-brand-border rounded-card shadow-soft p-5 space-y-2">
           <h2 className="text-sm font-bold text-brand-green">■ 応対の振り返り（管理者のみ）</h2>
+          {String(t.evaluation.good_point ?? "").trim() && (
+            <p className="text-sm font-semibold text-[#1d6b3f] bg-[#eafaf0] border-l-4 border-[#2e9e5b] rounded-md px-3 py-2">
+              👏 良かった点：{t.evaluation.good_point}
+            </p>
+          )}
           {renderEvaluation(t.evaluation).map((r) => (
             <p key={r.axis} className="text-sm text-brand-ink">
               ・{r.axis}：<b>{r.label}</b> ／ 根拠「{r.note}」
